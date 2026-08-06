@@ -51,7 +51,7 @@ from mathutils import Vector
 bl_info = {
     "name": "JARVIS — GLB con contrato (Palace)",
     "author": "Coordinación de Diseño Industrial y 3D — The Palace Company",
-    "version": (1, 1, 0),
+    "version": (1, 1, 2),
     "blender": (4, 2, 0),
     "location": "Propiedades > Objeto / Escena · File > Export > GLB JARVIS",
     "description": "Metadata de producción + linter que bloquea + export GLB "
@@ -407,10 +407,11 @@ tú corriges lo que haya adivinado mal"""
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        # La selección manda; sin selección, todas las piezas incluidas.
-        base = [o for o in context.selected_objects
-                if o.type in TIPOS_GEOMETRIA and o.jarvis_meta.incluir]
-        objetivos = base or piezas_de(context)
+        # TODAS las piezas incluidas, siempre. Hubo una regla de "la selección
+        # manda" y emboscó dos veces al primer usuario real ("0 prellenadas"
+        # con la selección vieja activa): fuera. Sólo llena huecos, así que
+        # pasar dos veces no rompe nada.
+        objetivos = piezas_de(context)
         if not objetivos:
             self.report({"WARNING"}, "No hay piezas que prellenar")
             return {"CANCELLED"}
@@ -442,29 +443,12 @@ tú corriges lo que haya adivinado mal"""
             if toco:
                 llenados += 1
 
-        # La emboscada del primer uso real: con una selección activa sólo se
-        # llena la selección, y las piezas de afuera se quedan con huecos sin
-        # que nadie lo diga. Se detecta y se avisa con el remedio.
-        fuera = []
-        if base:
-            fuera = [o.name for o in piezas_de(context) if o not in objetivos
-                     and not (o.jarvis_meta.pieza_id.strip()
-                              and o.jarvis_meta.pieza_nombre.strip()
-                              and o.jarvis_meta.capa.strip())]
-
         # El resultado se revisa de inmediato: el punto es dejar el linter verde.
         r = lint(context, con_geometria=False)
         context.window_manager["jarvis_lint"] = json.dumps(r, ensure_ascii=False)
         faltan = len(r["errores"])
-        msg = f"{llenados} piezas prellenadas"
-        if fuera:
-            msg += (f" · ⚠ {len(fuera)} con huecos FUERA de la selección "
-                    f"({', '.join(fuera[:3])}…): deselecciona todo (Alt+A) y repite")
-        elif faltan:
-            msg += f" · quedan {faltan} errores (ver panel)"
-        else:
-            msg += " · linter en verde"
-        self.report({"WARNING" if fuera else "INFO"}, msg)
+        self.report({"INFO"}, f"{llenados} piezas prellenadas" +
+                    (f" · quedan {faltan} errores (ver panel)" if faltan else " · linter en verde"))
         return {"FINISHED"}
 
 
