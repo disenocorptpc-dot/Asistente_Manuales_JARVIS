@@ -108,17 +108,29 @@ protocolo de enganche impreso al lado.
 
 - **F0 ✅** — verificaciones §11, shell AR, core completo (carga dinámica de
   GLB, escala, explotado, capas, picking, fichas), verificado en navegador.
-- **F1 ✅ en código** — arte del marcador validado, target compilado, marcador
-  desacoplado de la pieza, fórmula de escala normalizada, protocolo de enganche
-  en la UI y distinción entre 1:1 medido y `≈ 1:1` estimado.
-  **⏳ Falta el teléfono:** imprimir, desplegar y medir el 1:1 contra un objeto
-  de dimensión conocida. El escritorio no valida tracking.
+- **F1 ✅ en código y desplegado** — arte del marcador validado, target
+  compilado, marcador desacoplado de la pieza, fórmula de escala normalizada,
+  protocolo de enganche en la UI y distinción entre 1:1 medido y `≈ 1:1`
+  estimado. **⏳ Falta el teléfono:** imprimir la hoja al 100% y medir el 1:1
+  contra un objeto de dimensión conocida. El escritorio no valida tracking.
 - F2 — addon de Blender (metadata + linter) · F3 — HUD hi-tech completo ·
   F4 — captura/deep links · F5 — voz · F6 — SharePoint · F7 — gestos.
 
 ## Deploy
 
-Cloudflare Worker con static assets: `wrangler deploy`. El `wrangler.jsonc`
-ya trae las dos trampas resueltas (`not_found_handling: "none"`,
-`observability: enabled`); `public/_headers` pone `noindex` global y cachés
-inmutables para modelos y targets.
+> ⚠️ **Un push a `main` es un deploy a producción.** El repo está conectado a
+> **Cloudflare Workers Builds** (la CI de Cloudflare, no GitHub Actions — no hay
+> `.github/`), así que cada push se construye y publica solo en
+> <https://asistente-manuales-jarvis.disenocorptpc.workers.dev>. El token
+> `asistente-manuales-jarvis build token` de la cuenta lo creó Cloudflare al
+> conectar el repo; no se usa a mano. No hace falta `wrangler deploy` para
+> publicar, y `wrangler` no tiene por qué estar instalado.
+
+Cloudflare Worker con static assets. El `wrangler.jsonc` ya trae las dos trampas
+resueltas (`not_found_handling: "none"`, `observability: enabled`);
+`public/_headers` pone `noindex` global y cachés inmutables para modelos y
+targets.
+
+Para probar en teléfono no hace falta túnel: se pushea y se abre la URL. Lo que
+sí exige HTTPS y teléfono real es el AR — `getUserMedia` no funciona en HTTP ni
+pasando el HTML por WhatsApp.

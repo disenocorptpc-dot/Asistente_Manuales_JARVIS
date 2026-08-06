@@ -175,6 +175,20 @@ sí corren, y son las que se usaron para elegir la semilla.
   2026-08-06). `piezas: []` está vacío a propósito. El mecanismo de deep link
   `?pieza=` se queda para F4, pero no se precarga nada por default.
 
+## ⚠️ Un push a `main` es un deploy a producción
+
+El repo está conectado a **Cloudflare Workers Builds** — la CI de Cloudflare, no
+GitHub Actions (no hay `.github/`). Cada push a `main` se construye y publica
+solo en <https://asistente-manuales-jarvis.disenocorptpc.workers.dev>.
+
+- **No hace falta `wrangler deploy`** para publicar, ni tener `wrangler`
+  instalado. El token `asistente-manuales-jarvis build token` de la cuenta lo
+  creó Cloudflare al conectar el repo; no se usa a mano y no hay que pedirlo.
+- Consecuencia: no existe "commitear y ya", ni rama de staging. Si algo no debe
+  estar público todavía, no va a `main`.
+- Verificado el 2026-08-06: se pusheó F1 sin tocar Cloudflare y el sitio quedó
+  sirviendo el código nuevo en minutos (`.wrangler/` nunca existió en el clon).
+
 ## Git y credenciales
 
 - Identidad local del repo: `rsantarosa_palace / rsantarosa@palaceresorts.com`.
