@@ -81,6 +81,14 @@ body {
 }
 /* Tabletop se GRITA: no es el modo de autorización. */
 #hud-escala.tabletop { color: #0a1016; background: var(--bronce); }
+/* Escala estimada por el motor, no medida contra el marcador: se distingue a
+   simple vista del 1:1 exacto. Borde punteado = "esto no está clavado a nada".
+   Sin filter ni animación: sólo color y borde (Playbook §5). */
+#hud-escala.estimada {
+  color: #FFD9A8; background: var(--panel);
+  border-style: dashed; border-color: #FFD9A8;
+}
+#hud-escala.estimada.tabletop { color: #0a1016; background: #FFD9A8; }
 
 #estado {
   position: absolute; top: calc(64px + env(safe-area-inset-top)); left: 16px; right: 16px;

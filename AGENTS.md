@@ -13,18 +13,54 @@ se pagó. Léelo completo antes de tocar código.
 2. **[HANDOFF-Visor3D-AR.md](HANDOFF-Visor3D-AR.md)** — el brief: qué se
    construye, decisiones CERRADAS (no renegociar sin avisar), contrato de
    datos, fases. Ojo: tiene una corrección conocida, ver abajo.
-3. **[VERIFICACIONES.md](VERIFICACIONES.md)** — las 7 verificaciones del
-   binario con evidencia. No las repitas: ya están hechas.
+3. **[VERIFICACIONES.md](VERIFICACIONES.md)** — las 10 verificaciones del
+   binario y del compilador, con evidencia. No las repitas: ya están hechas.
 4. Este archivo.
 
 ## La corrección más importante (no está en el handoff)
 
 `detail.scaledWidth` de los eventos `imagefound/imageupdated` **NO** es el
 ancho del marcador en unidades de mundo — es **proporción de aspecto
-normalizada**. Los metros viven en `detail.scale`. El ancho real es
-`detail.scale × detail.scaledWidth`. Ya está implementado en
-[public/app/core/scale.js](public/app/core/scale.js); si tocas escala, no
-"corrijas" de vuelta a lo que dice el handoff §4.
+normalizada**. Los metros viven en `detail.scale`. Y `scale × scaledWidth`
+sólo colapsa al ancho real **si el marcador es vertical**; en horizontal
+sobreestima (20×15 cm → 6.67 u/m en vez de 5.00, 33% de más). La fórmula
+correcta para los dos casos, ya implementada en
+[public/app/core/scale.js](public/app/core/scale.js):
+
+```js
+anchoMundo = detail.scale * detail.scaledWidth
+           / Math.max(detail.scaledWidth, detail.scaledHeight);
+```
+
+Si tocas escala, no "corrijas" de vuelta a lo que dice el handoff §4.
+
+## El marcador NO está amarrado a la pieza
+
+Decisión del usuario (2026-08-06): **la pieza se carga a mano y el visor no
+trae ninguna precargada.** Por eso los marcadores viven en
+`contenido.marcadores` a nivel raíz, no dentro de `piezas[]`, y el shell los
+carga TODOS siempre — sin depender de `?pieza=`. El marcador aporta pose,
+escala y nada más; nunca identidad.
+
+Antes esto estaba al revés: el modo marcador sólo se activaba con un deep link
+que trajera `marcador` registrado, así que sin deep link el visor caía siempre
+a hitTest y **nunca daba un 1:1 real**. No lo vuelvas a acoplar.
+
+## El marcador mide 15.0 × 20.0 cm, vertical. No es negociable
+
+Tres restricciones independientes convergen ahí (VERIFICACIONES §9):
+
+1. El compilador fuerza el crop de un target plano a `height = width × 4/3`.
+   Otra proporción **se recorta en silencio** y el área trackeada deja de medir
+   `ancho_cm` — el 1:1 miente sin dar ningún error.
+2. `constants.json` exige mínimo 480×640 px de crop. A `px = cm × 32`
+   (HANDOFF §10) eso es exactamente 15 × 20 cm. Bonus: 480×640 es también el
+   tamaño nativo de la imagen de luminancia, así que no hay remuestreo.
+3. Ocupar ≥30% del cuadro a 35 cm pide ≥12.1 cm de ancho.
+
+El A5 de 14.8 cm del HANDOFF §6 **falla 1 y 2**. `generar-marcador.py` aborta
+con las tres guardas explicadas, así que no hay forma de generar un marcador
+que compile mal — pero si cambias medidas, entiende por qué antes de tocarlas.
 
 ## Reglas duras de arquitectura
 
@@ -80,20 +116,64 @@ python -m http.server 8317 --directory public
 - **F0 ✅** — verificaciones, scaffold, core completo (carga dinámica, escala,
   explotado procedural+override, capas, picking, fichas), shells AR/desktop,
   HUD funcional con botón de carga, `?debug=1`. Verificado en navegador.
-- **F1 ⏳ (siguiente)** — arte del marcador (brief en
-  `herramientas/BRIEF-marcador.md`, validador en
-  `herramientas/evaluar-marcador.py`), compilar target con
-  `npx @8thwall/image-target-cli` a `px = cm × 32`, registrar la pieza en
-  `contenido.json`, deploy y prueba de escala 1:1 en teléfono real.
+- **F1 ✅ en código, ⏳ falta el teléfono** — hecho: arte del marcador generado
+  por script y validado, target compilado, marcador desacoplado de la pieza,
+  fórmula de escala normalizada, protocolo de enganche en el portal y en el
+  HUD, e indicador que distingue **1:1 medido de `≈ 1:1` estimado** (autorizar
+  sobre una escala estimada es el peor error del proyecto, HANDOFF §4).
+  **Pendiente, y sólo se puede hacer con hardware:** imprimir
+  `herramientas/marcadores/JARVIS-M23-hoja-A4-300dpi.png` al 100%, `wrangler
+  deploy`, y medir el 1:1 en un teléfono real contra un objeto de dimensión
+  conocida. El escritorio NO valida tracking.
 - F2 — addon de Blender (metadata + linter). F3 — HUD hi-tech completo.
   F4 — captura + deep links. F5–F7 — ver HANDOFF §12.
+
+## Marcadores: cómo generar y compilar uno nuevo
+
+```bash
+python herramientas/generar-marcador.py --semilla 23
+python herramientas/evaluar-marcador.py herramientas/marcadores/JARVIS-M23-target-300dpi.png 15.0
+```
+
+El arte es **generativo y determinista por semilla** — no un binario huérfano:
+se regenera, se audita y se itera contra números. Es generativo porque lo que
+el tracker quiere es lo contrario de lo que se ve elegante a mano (contraste
+duro, detalle irregular parejo, cero repetición, cero simetría, cero áreas
+planas): eso es un algoritmo, no un dibujo.
+
+Semilla 23 elegida barriendo 3/7/11/19/23 y escogiendo por **aguante a la
+inclinación**, que es el criterio que decide en campo: 3054 puntos repetibles
+(mínimo 250), 100% de cobertura, 37% del cuadro a 35 cm, y sobreviven 1815
+puntos a 7° donde el menú medido en el BRIEF conservaba 18% de 206.
+
+Compilar (el CLI es interactivo; `normalizePath` quita las comillas, así que
+las rutas con espacios pasan entrecomilladas):
+
+```bash
+OVERWRITE_FILES=true npx @8thwall/image-target-cli
+# respuestas: "<ruta>/JARVIS-M23-target-32ppcm.png" · 1 (flat) · Y · "<ruta>/public/image-targets" · JARVIS-M23
+```
+
+Después: registrar `{id, target_json, ancho_cm, alto_cm}` en
+`contenido.marcadores`. **`ancho_cm` es el ancho del área trackeada impresa** y
+de ahí sale todo el 1:1: si miente, el visor miente. La regla de 10 cm de la
+hoja existe para atrapar justo eso — una impresora al 96% mete 4% de error.
+
+Ojo: `herramientas/evaluar-marcador.py` tiene una 4ª prueba (feature points del
+compilador de MindAR) que **no corre** — necesita `herramientas/compilar-en-node.mjs`,
+que se quedó en el repo de Pipo. Las pruebas 1–3 y el aguante a la inclinación
+sí corren, y son las que se usaron para elegir la semilla.
 
 ## Decisiones del usuario que NO se renegocian
 
 - 8th Wall open source + Three.js + Worker de Cloudflare (no Pages). Cerrado.
 - El tema de verificar la escala de impresión del marcador **no le interesa
-  al usuario** — no volver a plantearlo; dejar lo que el handoff ya pide.
-- Pendiente de decisión: pieza piloto (recomendación vigente: señalización).
+  al usuario** — no volver a plantearlo; dejar lo que el handoff ya pide. Está
+  cubierto sin fricción: la regla de 10 cm va impresa en la hoja y no hay
+  ningún diálogo en la app que lo pregunte.
+- **La pieza se carga a mano; el visor no trae ninguna precargada** (decidido
+  2026-08-06). `piezas: []` está vacío a propósito. El mecanismo de deep link
+  `?pieza=` se queda para F4, pero no se precarga nada por default.
 
 ## Git y credenciales
 

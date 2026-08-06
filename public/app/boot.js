@@ -103,14 +103,18 @@ async function arrancar() {
     while (!shell) {
       const eleccion = await portal.mostrar({
         titulo: 'Visor 3D AR',
-        texto: 'Apunta, ancla y revisa la pieza a escala real. Se te pedirá permiso de cámara y sensores.',
+        /* El protocolo de enganche va aquí y no sólo en el impreso (HANDOFF §3):
+           sin decirlo, el usuario intenta encuadrar marcador y pieza a la vez
+           —imposible con una pieza de 3 m—, falla, y culpa al tracking. */
+        texto: 'Acércate a ~35 cm del marcador impreso para enganchar; luego retrocede y '
+             + 'la pieza se queda plantada en su lugar. Se te pedirá permiso de cámara y sensores.',
         primario: 'Iniciar AR',
         secundario: 'Continuar sin AR',
       });
       if (eleccion === 'secundario') break;
       portal.ocultar();
       try {
-        shell = await iniciarAR({ visor, hud, debug, registro, contenido, motorListo });
+        shell = await iniciarAR({ visor, hud, debug, contenido, motorListo });
       } catch (e) {
         console.warn('AR no disponible:', e);
         debug.razonFallback(e?.message ?? String(e));

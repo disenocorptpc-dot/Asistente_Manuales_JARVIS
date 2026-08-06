@@ -1,0 +1,23 @@
+{
+  "imagePath": "image-targets/JARVIS-M23_luminance.png",
+  "metadata": null,
+  "name": "JARVIS-M23",
+  "type": "PLANAR",
+  "properties": {
+    "left": 0,
+    "top": 0,
+    "width": 480,
+    "height": 640,
+    "isRotated": false,
+    "originalWidth": 480,
+    "originalHeight": 640
+  },
+  "resources": {
+    "originalImage": "JARVIS-M23_original.png",
+    "croppedImage": "JARVIS-M23_cropped.png",
+    "thumbnailImage": "JARVIS-M23_thumbnail.png",
+    "luminanceImage": "JARVIS-M23_luminance.png"
+  },
+  "created": 1786032446568,
+  "updated": 1786032446568
+}

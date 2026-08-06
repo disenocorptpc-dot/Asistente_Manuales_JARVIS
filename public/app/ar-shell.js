@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { conectarMarcador } from './anchor-marker.js';
 import { conectarHitTest } from './anchor-hittest.js';
 
-export async function iniciarAR({ visor, hud, debug, registro, contenido, motorListo }) {
+export async function iniciarAR({ visor, hud, debug, contenido, motorListo }) {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('el navegador no soporta cámara');
   if (!isSecureContext) throw new Error('se necesita HTTPS');
 
@@ -40,21 +40,37 @@ export async function iniciarAR({ visor, hud, debug, registro, contenido, motorL
 
   await motorListo;
 
-  /* Modo A si hay target compilado; si no, modo B (hitTest). Ambos comparten
-     grafo y core: sólo cambia quién escribe la pose del ancla (HANDOFF §3). */
-  let anchor;
-  const marcador = registro?.marcador ?? {};
-  try {
-    const targetJson = await fetch(marcador.target_json).then((r) => {
-      if (!r.ok) throw new Error('sin target');
-      return r.json();
-    });
-    targetJson.imagePath = new URL(marcador.luminancia, location.href).pathname;
-    anchor = conectarMarcador({ visor, hud, targetJson, anchoCm: marcador.ancho_cm, contenido });
-  } catch {
-    anchor = conectarHitTest({ visor, hud });
+  /* Modo A si hay al menos un target compilado; si no, modo B (hitTest). Ambos
+     comparten grafo y core: sólo cambia quién escribe la pose del ancla
+     (HANDOFF §3).
+
+     El marcador NO está amarrado a una pieza: da pose y escala, nunca
+     identidad, así que se cargan TODOS los marcadores de contenido.json sin
+     depender de ?pieza=. El GLB llega por su cuenta (botón del HUD). Antes
+     esto sólo se activaba con deep link, y sin él el visor caía siempre a
+     hitTest — o sea, nunca daba 1:1 real. */
+  const targets = [];
+  for (const m of contenido.marcadores ?? []) {
+    try {
+      const json = await fetch(m.target_json).then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      });
+      /* imagePath del compilador es relativo a la raíz del sitio; absolutizarlo
+         contra la página lo hace sobrevivir a un deploy en subcarpeta. La única
+         fuente de verdad es el JSON compilado, no un campo duplicado. */
+      json.imagePath = new URL(json.imagePath, location.href).pathname;
+      if (!m.ancho_cm) throw new Error('sin ancho_cm: sin él no hay escala 1:1');
+      targets.push({ json, anchoCm: m.ancho_cm, id: m.id ?? json.name });
+    } catch (e) {
+      console.warn(`[ar] marcador ${m.id ?? m.target_json} no cargó:`, e.message);
+    }
   }
-  debug.modoAncla(anchor.nombre);
+
+  const anchor = targets.length
+    ? conectarMarcador({ visor, hud, targets, contenido })
+    : conectarHitTest({ visor, hud });
+  debug.modoAncla(targets.length ? `marcador (${targets.length})` : anchor.nombre);
 
   const lienzo = document.getElementById('lienzo');
 

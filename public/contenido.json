@@ -3,7 +3,20 @@
   "version": 1,
 
   "piezas": [],
-  "_piezas_porque": "Registro para deep links ?pieza= y para marcadores compilados (F4/F1). Vacío: el GLB se carga con el botón del HUD. Cada entrada: {pieza_id, nombre, modelo, marcador:{id, ancho_cm, montaje, target_json, luminancia}}.",
+  "_piezas_porque": "Registro OPCIONAL para deep links ?pieza= (F4). Vacío a propósito: la pieza se carga a mano con el botón del HUD, así que el visor no trae ninguna precargada. Cada entrada: {pieza_id, nombre, modelo}.",
+
+  "marcadores": [
+    {
+      "id": "JARVIS-M23",
+      "target_json": "image-targets/JARVIS-M23.json",
+      "ancho_cm": 15.0,
+      "alto_cm": 20.0,
+      "montaje": "pared o atril, a la altura de los ojos",
+      "semilla": 23,
+      "_hoja_para_imprimir": "herramientas/marcadores/JARVIS-M23-hoja-A4-300dpi.png — NO se sirve (herramientas/ está fuera de public/); es la ruta en el repo para mandar a imprimir al 100%."
+    }
+  ],
+  "_marcadores_porque": "El marcador NO está amarrado a una pieza: da pose y escala 1:1, nunca identidad. Por eso vive aquí y no dentro de piezas[] — se carga el marcador siempre y el GLB llega aparte. Todos los registrados entran juntos a imageTargetData, así que varias hojas de manual anclan en el mismo visor. ancho_cm es el ancho del ÁREA TRACKEADA impresa (el crop compilado salió 480x640 sin recortar, así que coincide con el arte completo): de aquí sale el factor unidades/cm y si miente, el 1:1 miente. 15.0 x 20.0 cm no es gusto — 3:4 exacto porque el compilador fuerza el crop a height = width x 4/3, y 480 x 640 px a 32 px/cm es el mínimo que constants.json acepta. Ver herramientas/generar-marcador.py.",
 
   "escala": {
     "modos": { "1:1": 1.0, "1:10": 0.1 },

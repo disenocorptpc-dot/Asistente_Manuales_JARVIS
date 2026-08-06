@@ -1,6 +1,8 @@
 # VERIFICACIONES §11 — evidencia leída del binario, no asumida
 
-**Fecha:** 2026-08-05 · **Binario:** `@8thwall/engine-binary@1.0.0` (jsdelivr, `xr.js` 1.03 MB + `xr-slam.js` 5.5 MB) · **Blender:** 5.2 headless.
+**Fechas:** §1–§8 el 2026-08-05 (F0) · §9–§10 el 2026-08-06 (F1).
+**Binario:** `@8thwall/engine-binary@1.0.0` (jsdelivr, `xr.js` 1.03 MB + `xr-slam.js` 5.5 MB) ·
+**Compilador de targets:** `@8thwall/image-target-cli@1.0.0` · **Blender:** 5.2 headless.
 Método: Playbook §10.8 — dumpear y leer el código minificado del vendor.
 
 ---
@@ -127,6 +129,81 @@ if ((og.includes(navegador) || rg.includes(modelo))
 
 **Implementado** en `public/app/ar-shell.js` (`XR8.run({..., sessionInitBehavior: 'fallback'})`).
 
+## 9. ⚠️ El compilador de targets impone la proporción 3:4 y un mínimo de 480×640 — F1
+
+Leído en `@8thwall/image-target-cli@1.0.0` (`src/crop.js`, `src/constants.json`,
+`src/interactive.js`), no en su README.
+
+```js
+// crop.js — getDefaultCrop, rama vertical
+const croppedHeight = Math.round((width * 4) / 3)
+return {left: 0, top: Math.round((height - croppedHeight) / 2), width, height: croppedHeight, ...}
+
+// interactive.js — crop manual, mismo forzado
+const height = Math.round((visualWidth * 4) / 3)
+console.log('Computed height based on 3:4 aspect ratio:', height)
+
+// constants.json
+{"minimumWidth": 480, "thumbnailHeight": 350, "luminanceHeight": 640, "minimumHeight": 640}
+```
+
+- **Un target plano SIEMPRE se recorta a 3:4.** Arte con otra proporción se
+  recorta **centrado y en silencio**. Consecuencia directa sobre el 1:1: el área
+  trackeada deja de ser el impreso, así que el `ancho_cm` declarado ya no
+  corresponde y **la escala miente** — sin ningún error visible.
+- **`validateCrop` rechaza crops menores a 480×640 px.** A la resolución
+  correcta de compilado del HANDOFF §10 (`px = cm × 32`) eso fija un **mínimo
+  físico de 15.0 × 20.0 cm**.
+- Los targets planos **no piden medida física** (sólo cilindro y cono la piden),
+  y el JSON sale con `metadata: null`. El tamaño físico vive únicamente en
+  `contenido.json` — es un dato humano, y si está mal nadie lo detecta.
+- La imagen de luminancia que carga el motor se emite a `luminanceHeight` 640 →
+  **480×640**.
+
+**Consecuencia: el marcador mide 15.0 × 20.0 cm, vertical.** Tres restricciones
+independientes convergen en esa medida — 3:4 exacto (no se recorta nada),
+480×640 px a 32 px/cm (el mínimo del compilador, y de paso el tamaño nativo de
+la luminancia: cero remuestreo), y ≥12.1 cm para ocupar ≥30% del cuadro a 35 cm.
+El A5 de 14.8 cm que el HANDOFF §6 traía de ejemplo **falla dos de las tres**:
+proporción 1:1.419 y 474 px de ancho.
+
+Implementado como guardas que abortan en `herramientas/generar-marcador.py`, con
+el mensaje que explica cuál de las tres se rompió. Compilado verificado:
+
+```json
+"properties": {"left": 0, "top": 0, "width": 480, "height": 640, "isRotated": false,
+               "originalWidth": 480, "originalHeight": 640}
+```
+
+`left/top` en 0 y el crop igual al original: **no recortó nada**, así que los
+15.0 cm declarados son de verdad el ancho del área trackeada.
+
+## 10. ⚠️ `scale × scaledWidth` sólo es correcto en vertical — corrección a §7
+
+§7 dejó abierto el caso horizontal ("queda por confirmar en campo"). Sale de la
+propia construcción del `detail`, sin necesidad de campo:
+
+| target | `scale` | `scaledWidth` | `scale × scaledWidth` |
+|---|---|---|---|
+| vertical (alto > ancho) | alto | ancho/alto | **ancho** ✔ |
+| horizontal (ancho > alto) | ancho | ancho/alto | ancho²/alto ✘ |
+
+Un marcador horizontal de 20×15 cm arroja **6.67 u/m donde deberían ser 5.00**:
+33% de sobreestimación, y la pieza se ve un tercio más grande de lo real.
+
+**Normalizar entre `max(scaledWidth, scaledHeight)` arregla los dos casos**
+(implementado en `public/app/core/scale.js`):
+
+```js
+const anchoMundo = detail.scale * detail.scaledWidth
+                 / Math.max(detail.scaledWidth, detail.scaledHeight);
+```
+
+Verificado ejecutando el módulo del core con los dos `detail`: ambos dan 5 u/m,
+y un marcador de 15 cm mide exactamente 0.75 unidades de mundo. El camino
+recomendado sigue siendo el vertical —`generar-marcador.py` lo exige— pero un
+target horizontal ya no miente en silencio.
+
 ---
 
 ## Estado
@@ -141,3 +218,5 @@ if ((og.includes(navegador) || rg.includes(modelo))
 | 6 | Extras de escena en export | ✅ sobreviven (Blender 5.2) |
 | 7 | Semántica de scaledWidth | ⚠️ corregida: `scale × scaledWidth` |
 | 8 | Edge → WebXR rompe en Android | ⚠️ esquivado con `sessionInitBehavior: 'fallback'` |
+| 9 | Crop del compilador de targets | ⚠️ fuerza 3:4 y mínimo 480×640 → marcador 15×20 cm |
+| 10 | scaledWidth en horizontal | ⚠️ §7 sólo valía en vertical; normalizado |

@@ -9,7 +9,19 @@
 
    En Pipo leer scaledWidth a secas funcionó porque en modo responsive el
    motor normaliza el target a ~1 unidad (scale ≈ 1). Coincidencia de modo,
-   no semántica. NUNCA hardcodear un factor de escala. */
+   no semántica. NUNCA hardcodear un factor de escala.
+
+   Y la corrección de la corrección (F1): scale × scaledWidth sólo da el ancho
+   real si el ALTO es la dimensión mayor. Con
+     scale        = max(anchoM, altoM)
+     scaledWidth  = ancho/alto,  scaledHeight = 1     (sin rotar)
+   un target vertical da alto × (ancho/alto) = ancho ✔, pero uno horizontal da
+   ancho²/alto ✘ — sobreestima, y el modelo saldría más grande de lo real.
+   Dividir entre max(scaledWidth, scaledHeight) normaliza los dos casos:
+     vertical  : max = 1      → alto × (ancho/alto) / 1       = ancho ✔
+     horizontal: max = a/h    → ancho × (ancho/alto)/(ancho/alto) = ancho ✔
+   El camino verificado sigue siendo el vertical (y el generador de marcadores
+   lo exige), pero así un target horizontal ya no miente en silencio. */
 
 export function crearEscala(grafo, config) {
   const modos = config?.modos ?? { '1:1': 1.0, '1:10': 0.1 };
@@ -28,8 +40,10 @@ export function crearEscala(grafo, config) {
 
     /* Modo A — derivación exacta desde el marcador, por construcción. */
     desdeMarcador(detail, anchoMarcadorCm) {
-      const anchoMundo = detail.scale * detail.scaledWidth;
-      if (!anchoMundo || !anchoMarcadorCm) return;
+      const norma = Math.max(detail.scaledWidth ?? 0, detail.scaledHeight ?? 0);
+      if (!norma || !detail.scale || !anchoMarcadorCm) return;
+      const anchoMundo = (detail.scale * detail.scaledWidth) / norma;
+      if (!(anchoMundo > 0)) return;
       const unidadesPorCm = anchoMundo / anchoMarcadorCm;
       unidadesPorMetro = unidadesPorCm * 100;
       aplicar();

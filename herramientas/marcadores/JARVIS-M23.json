@@ -1,0 +1,18 @@
+{
+  "marcador_id": "JARVIS-M23",
+  "semilla": 23,
+  "ancho_cm": 15.0,
+  "alto_cm": 20.0,
+  "orientacion": "vertical",
+  "proporcion": "3:4",
+  "dpi": 300,
+  "ppcm_compilador": 32,
+  "target_compilador_px": [
+    480,
+    640
+  ],
+  "hoja": "A4 vertical, imprimir al 100%",
+  "_porque_vertical": "scale × scaledWidth sólo da el ancho real si alto > ancho (VERIFICACIONES §7)",
+  "_porque_3_4": "el compilador fuerza el crop plano a height = width × 4/3; otra proporción se recorta en silencio",
+  "_porque_15x20": "480 × 640 px a 32 px/cm = el mínimo de constants.json y el tamaño nativo de la imagen de luminancia"
+}

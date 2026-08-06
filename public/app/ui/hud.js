@@ -49,9 +49,24 @@ export function crearHUD(visor) {
 
   // ── Escala: visible SIEMPRE. Autorizar en tabletop creyendo ver 1:1
   //    es el peor error posible del proyecto (HANDOFF §4).
+  //
+  //    Y por el mismo argumento hay que distinguir DE DÓNDE sale el 1:1: del
+  //    marcador es exacto por construcción; del motor es una estimación de la
+  //    altura de la cámara sobre el piso y arrastra error. Un "1:1" idéntico
+  //    en los dos casos invita a autorizar sobre una medida estimada, que es
+  //    la misma trampa que el toggle de tabletop existe para evitar.
+  let fuente = null; // 'marcador' | 'estimada' | null
   function pintarEscala() {
-    el.escala.textContent = visor.escala.modo;
-    el.escala.classList.toggle('tabletop', visor.escala.modo !== '1:1');
+    const modo = visor.escala.modo;
+    const estimada = fuente === 'estimada';
+    el.escala.textContent = estimada ? `≈ ${modo}` : modo;
+    el.escala.classList.toggle('tabletop', modo !== '1:1');
+    el.escala.classList.toggle('estimada', estimada);
+    el.escala.title = estimada
+      ? 'Escala ESTIMADA por el motor, no medida. No autorices con esto: usa el marcador impreso.'
+      : fuente === 'marcador'
+        ? 'Escala derivada del ancho impreso del marcador: exacta por construcción.'
+        : 'Escala aún sin referencia.';
   }
   el.escala.addEventListener('click', () => {
     visor.escala.cambiarModo(visor.escala.modo === '1:1' ? '1:10' : '1:1');
@@ -103,9 +118,36 @@ export function crearHUD(visor) {
   return {
     mostrarFicha,
     estado,
-    trackingEnganchado: () => estado('Anclado al marcador'),
+
+    /* El protocolo de enganche va en la UI, no sólo en el impreso (HANDOFF §3):
+       sin esto el usuario intenta encuadrar marcador y pieza a la vez, falla, y
+       concluye que el tracking es malo. */
+    modoMarcador(n) {
+      fuente = null;
+      pintarEscala();
+      estado(n > 1
+        ? `Apunta a un marcador (${n} registrados) y acércate a ~35 cm`
+        : 'Apunta al marcador y acércate a ~35 cm. Luego retrocede: la pieza se queda.');
+    },
+
+    trackingEnganchado() {
+      fuente = 'marcador';
+      pintarEscala();
+      estado(visor.cargado
+        ? 'Anclado · escala 1:1 real. Ya puedes retroceder.'
+        : 'Anclado al marcador · carga un GLB con ⬆ para verlo aquí');
+    },
+
     trackingExtendido: () => estado('Sostenido por SLAM — reacércate al marcador si se desvía'),
-    modoSinMarcador: () => { if (visor.cargado) estado('Sin marcador: escala estimada, no para autorización 1:1'); },
+
+    modoSinMarcador() {
+      fuente = 'estimada';
+      pintarEscala();
+      estado(visor.cargado
+        ? 'Sin marcador: escala estimada, no sirve para autorizar 1:1'
+        : 'Sin marcador: escala estimada · carga un GLB con ⬆');
+    },
+
     coaching: (mal) => el.coaching.classList.toggle('visible', mal),
     update() {},
   };
