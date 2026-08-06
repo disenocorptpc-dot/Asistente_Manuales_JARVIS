@@ -23,6 +23,13 @@
 const NOMBRE_VALIDO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.glb$/;
 const BYTES_MAX = 25 * 1024 * 1024;
 
+/* Candado de facturación: el free tier de R2 son 10 GB/mes y Cloudflare NO
+   ofrece tope duro nativo — así que el tope lo pone este Worker, que es lo
+   único que puede escribir. 9 GB deja margen para no rozar el límite ni con
+   el bucket lleno. Pasarse en lecturas es imposible en la práctica: el edge
+   cachea los GET y el egress de R2 es gratis por diseño. */
+const BUCKET_MAX_BYTES = 9 * 1024 * 1024 * 1024;
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
@@ -101,6 +108,14 @@ async function publicar(req, env, url) {
       });
   }
 
+  // Candado de facturación: si esta publicación rebasa el tope, se rechaza.
+  const enUso = await bytesEnBucket(env);
+  if (enUso + bytes > BUCKET_MAX_BYTES)
+    return json(507, {
+      error: `el bucket lleva ${(enUso / 1073741824).toFixed(2)} GB y con este archivo pasaría el tope de 9 GB ` +
+             '(candado para no salir del free tier de R2). Despublica revisiones viejas o sube el tope a conciencia.',
+    });
+
   const obj = await env.MODELOS.put(archivo, req.body, {
     httpMetadata: { contentType: 'model/gltf-binary' },
   });
@@ -125,6 +140,19 @@ async function listar(env) {
       publicado: o.uploaded,
     })),
   });
+}
+
+/* Suma el tamaño de todo lo publicado. A la escala del área son decenas de
+   objetos; el loop de cursor está por si algún día son miles. */
+async function bytesEnBucket(env) {
+  let total = 0;
+  let cursor;
+  do {
+    const pagina = await env.MODELOS.list({ limit: 1000, cursor });
+    for (const o of pagina.objects) total += o.size;
+    cursor = pagina.truncated ? pagina.cursor : undefined;
+  } while (cursor);
+  return total;
 }
 
 /* Comparación en tiempo constante cuando la plataforma la da; si no,
