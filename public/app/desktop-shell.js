@@ -19,27 +19,36 @@ export function iniciarDesktop({ visor, hud, debug, contenido }) {
   sol.position.set(3, 6, 4);
   escena.add(sol);
 
-  const camara = new THREE.PerspectiveCamera(45, 1, 0.01, 100);
+  const camara = new THREE.PerspectiveCamera(45, 1, 0.01, 500);
+  camara.position.set(1.5, 1.2, 2);
+  const controles = new OrbitControls(camara, lienzo);
+  controles.enableDamping = true;
 
   /* En desktop no hay marcador: metros del GLB = unidades de escena. */
   visor.escala.desdeEstimacion();
   visor.grafo.ancla.visible = true;
   escena.add(visor.grafo.ancla);
 
-  // Encuadre inicial contra el bbox real del modelo, no números mágicos.
-  const caja = new THREE.Box3().setFromObject(visor.grafo.ancla);
-  const alto = Math.max(caja.getSize(new THREE.Vector3()).length(), 0.5);
-  camara.position.set(alto * 0.9, alto * 0.7, alto * 1.2);
-
-  const controles = new OrbitControls(camara, lienzo);
-  controles.target.set(0, caja.getCenter(new THREE.Vector3()).y, 0);
-  controles.enableDamping = true;
-
   // Retícula de piso en bronce: ancla visual, comunica "esto está medido".
   const reticula = new THREE.GridHelper(4, 40, 0xB88F69, 0x25404F);
   reticula.material.transparent = true;
   reticula.material.opacity = 0.4;
   escena.add(reticula);
+
+  /* Encuadre contra el bbox real del modelo — al arrancar si ya hay modelo
+     y cada vez que el HUD carga uno nuevo. Nada de números mágicos. */
+  function encuadrar() {
+    if (!visor.cargado) return;
+    const caja = new THREE.Box3().setFromObject(visor.grafo.ancla);
+    const tam = Math.max(caja.getSize(new THREE.Vector3()).length(), 0.5);
+    camara.position.set(tam * 0.9, tam * 0.7, tam * 1.2);
+    controles.target.copy(caja.getCenter(new THREE.Vector3()));
+    controles.update();
+    // La retícula acompaña el tamaño del modelo (pieza de 10 cm o de 5 m).
+    reticula.scale.setScalar(Math.max(tam / 4, 0.05));
+  }
+  visor.onCargar(encuadrar);
+  encuadrar();
 
   function medir() {
     renderer.setSize(innerWidth, innerHeight, false);
@@ -50,6 +59,7 @@ export function iniciarDesktop({ visor, hud, debug, contenido }) {
   medir();
 
   lienzo.addEventListener('pointerdown', (ev) => {
+    if (!visor.picker) return;
     const x = (ev.clientX / innerWidth) * 2 - 1;
     const y = -(ev.clientY / innerHeight) * 2 + 1;
     hud.mostrarFicha(visor.picker.tocar(x, y, camara));

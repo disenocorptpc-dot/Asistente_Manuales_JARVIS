@@ -1,33 +1,50 @@
 /* Carga del GLB y parseo del contrato de datos (HANDOFF §6).
-   El GLB se describe a sí mismo vía extras; aquí se valida y se indexa.
-   GLTFLoader de three copia extras de escena a gltf.scene.userData y
-   extras de nodo a object.userData (verificado en VERIFICACIONES.md §6). */
+   GLTFLoader de three copia extras de escena a gltf.scene.userData y extras
+   de nodo a object.userData (verificado en VERIFICACIONES.md §6).
+
+   Contrato: un GLB del pipeline trae palace_schema=1 y unidad "m". Un GLB
+   ajeno (prueba, intercambio) se carga igual pero en MODO INSPECCIÓN: cada
+   mesh se vuelve pieza por su nombre y los avisos se muestran en el HUD —
+   degradar avisando, nunca cargar mal en silencio. */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const ANCLAJES = new Set(['base_centro', 'centro_geometrico', 'punto_named']);
 
-export async function cargarPieza(url) {
+export async function cargarPieza(url, nombreArchivo = '') {
   const gltf = await new GLTFLoader().loadAsync(url);
   const modelo = gltf.scene;
   const meta = modelo.userData ?? {};
+  const avisos = [];
 
-  // Rechazar en voz alta, nunca cargar mal en silencio (HANDOFF §4).
-  if (meta.palace_schema !== 1)
-    throw new Error(`GLB sin palace_schema=1 en extras de escena (${url}). ¿Se exportó con el addon?`);
-  if (meta.unidad !== 'm')
+  const conContrato = meta.palace_schema === 1;
+  if (!conContrato) {
+    avisos.push('GLB sin contrato palace_schema — modo inspección');
+  } else if (meta.unidad !== 'm') {
+    // Con contrato declarado, la unidad equivocada SÍ es fatal: el 1:1 miente.
     throw new Error(`GLB declara unidad "${meta.unidad}" — el contrato exige metros.`);
+  }
+  if (!conContrato) avisos.push('escala asumida: 1 unidad = 1 m');
 
-  // Índice de piezas: todo mesh con pieza_id en sus extras (o en su ancestro
-  // directo, para meshes multi-material que glTF parte en primitivas).
+  // Índice de piezas: con contrato, todo nodo con pieza_id; sin contrato,
+  // cada mesh por su nombre. La raíz trae los extras de ESCENA, no es pieza.
   const piezas = new Map();
   modelo.traverse((obj) => {
-    if (obj === modelo) return; // la raíz trae los extras de ESCENA, no es pieza
-    const d = obj.userData;
-    if (d?.pieza_id && !piezas.has(d.pieza_id)) piezas.set(d.pieza_id, obj);
+    if (obj === modelo) return;
+    if (conContrato) {
+      const d = obj.userData;
+      if (d?.pieza_id && !piezas.has(d.pieza_id)) piezas.set(d.pieza_id, obj);
+    } else if (obj.isMesh) {
+      const id = obj.name || `mesh_${piezas.size + 1}`;
+      if (!piezas.has(id)) {
+        obj.userData.pieza_id = id;
+        obj.userData.pieza_nombre = obj.userData.pieza_nombre ?? id;
+        piezas.set(id, obj);
+      }
+    }
   });
   if (piezas.size === 0)
-    throw new Error('GLB sin ninguna pieza con pieza_id en extras — no hay nada que despiezar.');
+    throw new Error('GLB sin piezas utilizables — ni pieza_id en extras ni meshes con nombre.');
 
   recentrarPivote(modelo, meta.anclaje ?? 'base_centro');
 
@@ -35,7 +52,8 @@ export async function cargarPieza(url) {
   const reposo = new Map();
   for (const [id, obj] of piezas) reposo.set(id, obj.position.clone());
 
-  return { modelo, meta, piezas, reposo };
+  const nombre = meta.pieza_nombre ?? nombreArchivo ?? 'GLB';
+  return { modelo, meta, piezas, reposo, avisos, conContrato, nombre };
 }
 
 /* El equivalente GLB del translate(0,0.5,0) de Pipo: la pieza se asienta

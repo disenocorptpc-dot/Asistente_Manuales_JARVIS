@@ -29,7 +29,7 @@ export async function iniciarAR({ visor, hud, debug, registro, contenido, motorL
   /* Modo A si hay target compilado; si no, modo B (hitTest). Ambos comparten
      grafo y core: sólo cambia quién escribe la pose del ancla (HANDOFF §3). */
   let anchor;
-  const marcador = registro.marcador ?? {};
+  const marcador = registro?.marcador ?? {};
   try {
     const targetJson = await fetch(marcador.target_json).then((r) => {
       if (!r.ok) throw new Error('sin target');
@@ -99,7 +99,7 @@ export async function iniciarAR({ visor, hud, debug, registro, contenido, motorL
 
     /* Picking por tap: el shell traduce el evento a NDC; el core raycastea. */
     lienzo.addEventListener('pointerdown', (ev) => {
-      if (!camaraXR) return;
+      if (!camaraXR || !visor.picker) return;
       const x = (ev.clientX / innerWidth) * 2 - 1;
       const y = -(ev.clientY / innerHeight) * 2 + 1;
       const hit = visor.picker.tocar(x, y, camaraXR);

@@ -1,5 +1,6 @@
 /* Secuencia de arranque, heredada de Pipo (Playbook §2):
-   - El motor y el modelo se precargan EN PARALELO desde que abre la página.
+   - El motor se precarga DESDE YA; el GLB llega del botón del HUD (o de
+     ?pieza= si contenido.json registra alguna).
    - La cámara se pide UNO MISMO antes de XR8.run, para tener el error real.
    - Fallback sin cámara obligatorio: no es un error, es la experiencia
      menos el AR. */
@@ -15,7 +16,7 @@ import { crearDebug } from './debug.js';
 const params = new URLSearchParams(location.search);
 const MODO_FORZADO = params.get('modo'); // ?modo=desktop fuerza el fallback
 
-/* El motor arranca a descargarse DESDE YA, en paralelo con el GLB. */
+/* El motor arranca a descargarse DESDE YA. */
 function esperarXR8(ms) {
   return new Promise((res, rej) => {
     if (window.XR8) return res();
@@ -31,20 +32,23 @@ const motorListo = (async () => {
 motorListo.catch(() => {}); // si caemos a desktop, que no truene suelto
 
 const contenido = await fetch('contenido.json').then((r) => r.json());
-const registro = params.get('pieza')
-  ? contenido.piezas.find((p) => p.pieza_id === params.get('pieza'))
-  : contenido.piezas[0];
-if (!registro) {
-  document.getElementById('estado').textContent = `No existe la pieza "${params.get('pieza')}"`;
-  throw new Error('pieza desconocida');
-}
 
-const visorPromesa = crearVisor(registro.modelo, contenido);
+/* Deep link ?pieza= (F4): sólo aplica si contenido.json la registra. */
+const registro = params.get('pieza')
+  ? (contenido.piezas ?? []).find((p) => p.pieza_id === params.get('pieza')) ?? null
+  : null;
 
 async function arrancar() {
-  const visor = await visorPromesa;
-  const hud = crearHUD(visor, registro);
+  const visor = crearVisor(contenido);
+  const hud = crearHUD(visor);
   const debug = crearDebug(visor);
+
+  if (registro) {
+    try { await visor.cargar(registro.modelo); }
+    catch (e) { hud.estado(`No se pudo cargar ${registro.pieza_id}: ${e.message}`); }
+  } else {
+    hud.estado('Carga un GLB para empezar');
+  }
 
   let shell = null;
   if (MODO_FORZADO !== 'desktop') {

@@ -2,23 +2,8 @@
   "_que_es": "Todo parámetro medido o decidido vive aquí con su porqué, no en el código. Cambiar de pieza no toca JavaScript.",
   "version": 1,
 
-  "piezas": [
-    {
-      "pieza_id": "SIG-DEMO-01",
-      "nombre": "Señalización demo (GLB sintético)",
-      "modelo": "models/SIG-DEMO-01.glb",
-      "_modelo_porque": "Generado por herramientas/generar-glb-sintetico.py — Playbook §10.5: el riesgo técnico se valida con asset sintético; el real sólo reemplaza este archivo.",
-      "marcador": {
-        "id": "demo_01",
-        "ancho_cm": 14.8,
-        "_ancho_porque": "A5 apaisado menos margen. El arte impreso DEBE llevar la regla de 10 cm para verificar la impresión al 100%.",
-        "montaje": "pared",
-        "target_json": "image-targets/demo_01.json",
-        "luminancia": "image-targets/demo_01_luminance.png",
-        "_estado": "PENDIENTE — todavía no hay arte compilado; sin estos archivos el visor arranca en modo hitTest/colocación libre."
-      }
-    }
-  ],
+  "piezas": [],
+  "_piezas_porque": "Registro para deep links ?pieza= y para marcadores compilados (F4/F1). Vacío: el GLB se carga con el botón del HUD. Cada entrada: {pieza_id, nombre, modelo, marcador:{id, ancho_cm, montaje, target_json, luminancia}}.",
 
   "escala": {
     "modos": { "1:1": 1.0, "1:10": 0.1 },
