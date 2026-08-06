@@ -1,10 +1,12 @@
 {
-  // Worker de puros assets estáticos: no hay código de servidor todavía.
-  // Cuando llegue F6 (proxy de SharePoint) se agrega "main" con la ruta
-  // /api/model/:id — misma unidad de deploy, por eso Worker y no Pages.
+  // F6 parcial: el Worker ganó su primera ruta de código (src/worker.js) —
+  // publicación y servicio de GLBs desde R2. Los assets estáticos se sirven
+  // ANTES de llegar al código: sólo lo que no existe en public/ cae al main.
+  // Esta era exactamente la razón de elegir Worker y no Pages.
   // Mismo nombre que el Worker ya desplegado en la cuenta (asistente-manuales-jarvis
   // .disenocorptpc.workers.dev) — si difiere, un deploy crearía OTRO worker.
   "name": "asistente-manuales-jarvis",
+  "main": "src/worker.js",
   "compatibility_date": "2026-08-05",
 
   "assets": {
@@ -14,6 +16,17 @@
     // con status 200 y los errores se volverían invisibles.
     "not_found_handling": "none"
   },
+
+  "r2_buckets": [
+    {
+      // Los GLB PUBLICADOS (entregables comprimidos y versionados:
+      // SIG-LOBBY-01-R3.glb). Los masters siguen en SharePoint; esto es el
+      // espejo que el visor sirve con cache inmutable. El secret
+      // PUBLICAR_TOKEN (wrangler secret) protege la escritura.
+      "binding": "MODELOS",
+      "bucket_name": "jarvis-modelos"
+    }
+  ],
 
   "observability": {
     // Logs desde el prototipo: cuántos escanean, qué piezas abren,
