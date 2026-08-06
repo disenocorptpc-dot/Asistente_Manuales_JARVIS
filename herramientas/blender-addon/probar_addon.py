@@ -195,6 +195,17 @@ nombres3 = {n.get("name") for n in g3.get("nodes", [])}
 check("export NO truena con el fantasma", r == {"FINISHED"})
 check("el fantasma no viaja", "fantasma_excluido" not in nombres3)
 
+print("\n== 7. la copia descargable del addon está sincronizada ==")
+# El equipo baja el addon de https://asistente.../addon/jarvis_glb.py — una
+# copia en public/. Si difiere del canónico, los compañeros instalan una
+# versión vieja sin que nadie lo note: este check truena el commit.
+canonico = (AQUI / "jarvis_glb.py").read_bytes()
+publica = AQUI.parents[1] / "public" / "addon" / "jarvis_glb.py"
+check("public/addon/jarvis_glb.py existe", publica.exists())
+if publica.exists():
+    check("idéntico al canónico (copia tras editar el addon)",
+          publica.read_bytes() == canonico)
+
 print(f"\nGLB de prueba: {salida}  ({salida.stat().st_size} bytes)")
 if FALLAS:
     print(f"\n{len(FALLAS)} FALLAS: {FALLAS}")

@@ -258,9 +258,17 @@ API de GitHub (GLB + piezas.json juntos, reintento si la rama se movió) usando
 el secret GITHUB_PAT_MODELOS (fine-grained, sólo Contents de ese repo, nunca
 sale del worker). La CI despliega y la pieza cae al 📚 Catálogo de la app.
 
-Kit de un compañero nuevo: `jarvis_glb.py` (Install from Disk) + pegar el
-token del equipo en las preferencias. Nada más. E2E verificado: commit
-1acc98a hecho por el worker.
+Kit de un compañero nuevo: bajar
+`https://asistente-manuales-jarvis.disenocorptpc.workers.dev/addon/jarvis_glb.py`
+(Install from Disk) + pegar el token del equipo en las preferencias. Nada
+más. La descarga es una COPIA en `public/addon/` — al editar el addon hay
+que recopiarla, y `probar_addon.py` truena si difiere del canónico. E2E
+verificado: commit 1acc98a hecho por el worker.
+
+El catálogo no crece por revisión: publicar el mismo pieza_id REEMPLAZA su
+renglón en piezas.json (el worker y el script lo hacen igual). Los GLB
+viejos se quedan en el repo a propósito (historia/rollback/cache). Retirar
+una pieza completa = editar piezas.json en el repo de modelos.
 
 Trampas pagadas: (1) el Browser Integrity Check de Cloudflare responde
 **403/1010** a un urllib sin User-Agent — el addon manda `jarvis-addon/...`;
