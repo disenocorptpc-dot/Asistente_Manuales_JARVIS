@@ -4,7 +4,7 @@
    Regla de rendimiento heredada: sin backdrop-filter, sin mix-blend-mode;
    sólo se animan opacity y transform. */
 
-export function crearHUD(visor) {
+export function crearHUD(visor, sonido = null) {
   const $ = (id) => document.getElementById(id);
   const el = {
     escala: $('hud-escala'),
@@ -18,7 +18,20 @@ export function crearHUD(visor) {
     archivo: $('hud-archivo'),
     abajo: $('hud-abajo'),
     orienta: $('hud-orienta'),
+    sonido: $('hud-sonido'),
   };
+
+  // ── Silencio persistente. Sin Web Audio (o sin módulo), el botón sobra.
+  if (sonido) {
+    const pintarSonido = () => {
+      el.sonido.textContent = sonido.activo ? '🔊' : '🔇';
+      el.sonido.classList.toggle('mudo', !sonido.activo);
+    };
+    el.sonido.addEventListener('click', () => { sonido.alternar(); pintarSonido(); });
+    pintarSonido();
+  } else {
+    el.sonido.remove();
+  }
 
   // ── Cargar GLB: el recurso llega del usuario, no de un catálogo.
   el.cargar.addEventListener('click', () => el.archivo.click());
@@ -46,6 +59,7 @@ export function crearHUD(visor) {
     mostrarFicha(null);
     el.abajo.classList.add('visible');
     estado(pieza.avisos.length ? `⚠ ${pieza.avisos.join(' · ')}` : `${pieza.piezas.size} piezas`);
+    sonido?.carga();
   });
 
   // ── Escala: visible SIEMPRE. Autorizar en tabletop creyendo ver 1:1
@@ -75,6 +89,7 @@ export function crearHUD(visor) {
     const i = modos.indexOf(visor.escala.modo);
     visor.escala.cambiarModo(modos[(i + 1) % modos.length]);
     pintarEscala();
+    sonido?.tick();
   });
   pintarEscala();
 
@@ -89,6 +104,7 @@ export function crearHUD(visor) {
   el.orienta.addEventListener('click', () => {
     visor.grafo.orientar(visor.grafo.orientacion === 'mesa' ? 'pared' : 'mesa');
     pintarOrienta();
+    sonido?.tick();
   });
   pintarOrienta();
 
@@ -111,6 +127,7 @@ export function crearHUD(visor) {
       b.addEventListener('click', () => {
         const visible = visor.capas.alternar(nombre);
         b.classList.toggle('activa', visible);
+        sonido?.tick();
       });
       el.capas.appendChild(b);
     }
@@ -124,6 +141,7 @@ export function crearHUD(visor) {
   };
   function mostrarFicha(hit) {
     if (!hit) { el.ficha.classList.remove('visible'); return; }
+    sonido?.blip();
     const f = hit.ficha;
     el.ficha.innerHTML =
       `<h2>${f.pieza_nombre ?? f.pieza_id}</h2>` +
@@ -169,9 +187,13 @@ export function crearHUD(visor) {
       estado(visor.cargado
         ? 'Anclado · escala 1:1 real. Ya puedes retroceder.'
         : 'Anclado al marcador · carga un GLB con ⬆ para verlo aquí');
+      sonido?.lock();
     },
 
-    trackingExtendido: () => estado('Sostenido por SLAM — reacércate al marcador si se desvía'),
+    trackingExtendido() {
+      estado('Sostenido por SLAM — reacércate al marcador si se desvía');
+      sonido?.perdida();
+    },
 
     modoSinMarcador() {
       fuente = 'estimada';

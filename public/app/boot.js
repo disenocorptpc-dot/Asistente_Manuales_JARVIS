@@ -14,6 +14,7 @@ import { iniciarAR } from './ar-shell.js';
 import { iniciarDesktop } from './desktop-shell.js';
 import { crearHUD } from './ui/hud.js';
 import { crearVoz } from './ui/voz.js';
+import { crearSonido } from './ui/sonido.js';
 import { crearDebug } from './debug.js';
 
 const params = new URLSearchParams(location.search);
@@ -78,9 +79,10 @@ const portal = (() => {
 
 async function arrancar() {
   const visor = crearVisor(contenido);
-  const hud = crearHUD(visor);
+  const sonido = crearSonido(contenido.sonido);
+  const hud = crearHUD(visor, sonido);
   const debug = crearDebug(visor);
-  crearVoz({ visor, hud }); // sin Web Speech API el botón desaparece solo
+  crearVoz({ visor, hud, sonido }); // sin Web Speech API el botón desaparece solo
 
   /* Con ?debug=1, un asidero en consola para diagnosticar en dispositivo:
      jarvis.visor.explotar(1, 1), jarvis.visor.orbita.iniciar(), etc. */

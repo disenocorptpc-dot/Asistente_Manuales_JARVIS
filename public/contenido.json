@@ -34,6 +34,11 @@
     "_porque": "Desplazamiento máximo del explotado procedural cuando la pieza no trae explode_dist_cm propio. Se afina en campo con el slider."
   },
 
+  "sonido": {
+    "volumen": 0.2,
+    "_porque": "Master del sonido del HUD (ui/sonido.js, sintetizado con Web Audio — cero assets). Bajo a propósito: es un instrumento, no un videojuego. El botón 🔊 silencia y persiste en localStorage: frente a los dueños el drama suma, en el banco del taller ocho horas no."
+  },
+
   "orbita": {
     "vuelta_segundos": 12,
     "_porque": "Turntable de presentación (comando de voz 'órbita'). Una vuelta en 12 s: lo bastante lento para leer la pieza sin marear, sobre todo en AR donde el fondo es el mundo real."

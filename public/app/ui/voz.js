@@ -48,7 +48,7 @@ export function emparejar(texto, capas = []) {
   return null;
 }
 
-export function crearVoz({ visor, hud }) {
+export function crearVoz({ visor, hud, sonido = null }) {
   const boton = document.getElementById('hud-voz');
   const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
   if (!SR) {
@@ -61,18 +61,25 @@ export function crearVoz({ visor, hud }) {
   rec.interimResults = false;
   rec.maxAlternatives = 4; // se intenta emparejar CADA alternativa, no sólo la primera
 
+  /* Cada acción trae su sonido: los toggles del HUD ya hacen tick solos
+     (van por la fachada, que dispara el botón real), y el despiece y la
+     órbita ponen el drama aquí. */
   const ejecutar = (orden) => {
     switch (orden.accion) {
       case 'explotar':
         if (!visor.cargado) return null;
         visor.explotar(orden.arg, 1.2);
+        if (orden.arg) sonido?.explota(); else sonido?.arma();
         return orden.arg ? 'despiece' : 'armado';
       case 'orbita':
         if (orden.arg) visor.orbita.iniciar(); else visor.orbita.detener();
+        sonido?.orbita(orden.arg);
         return orden.arg ? 'orbitando' : 'quieta';
       case 'escala':
+        sonido?.exito();
         return `escala ${hud.escalaA(orden.arg)}`;
       case 'orienta':
+        sonido?.exito();
         return `marcador en ${hud.orientaA(orden.arg)}`;
       case 'capa':
         return hud.alternarCapa(orden.arg) ? `capa ${orden.arg}` : null;
@@ -90,6 +97,7 @@ export function crearVoz({ visor, hud }) {
         if (hecho) { hud.estado(`🎤 ${hecho}`); return; }
       }
     }
+    sonido?.error();
     hud.estado(`🎤 no entendí «${res[0]?.transcript ?? ''}»`);
   };
 
@@ -114,6 +122,7 @@ export function crearVoz({ visor, hud }) {
     if (escuchando) return;
     escuchando = true;
     boton.classList.add('grabando');
+    sonido?.escucha();
     hud.estado('🎤 escuchando…');
     try { rec.start(); } catch { /* start doble: inofensivo */ }
   };

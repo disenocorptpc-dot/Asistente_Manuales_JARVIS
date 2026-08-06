@@ -151,6 +151,13 @@ python -m http.server 8317 --directory public
   (escalaA/orientaA/alternarCapa) para que los botones queden consistentes.
   Con `?debug=1`, `window.jarvis = {visor, hud}` es el asidero de consola
   para diagnosticar en dispositivo.
+- **Sonido del HUD** (`ui/sonido.js`): sintetizado con Web Audio, CERO assets
+  — chirps de seno/triángulo y un soplo de ruido filtrado para el despiece;
+  el carácter vive en parámetros, no en MP3s. El AudioContext se crea en el
+  primer gesto (política de autoplay iOS). Eventos: lock/pérdida del
+  marcador, carga de GLB, explota/arma, órbita, mic, éxito/error de voz, y
+  tick en cada toggle. Botón 🔇 persistente en localStorage
+  (`jarvis_sonido`); volumen master en `contenido.json`.
 - F2 — addon de Blender (metadata + linter). F3 — HUD hi-tech completo.
   F4 — captura + deep links. F5–F7 — ver HANDOFF §12.
 
