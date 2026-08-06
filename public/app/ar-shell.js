@@ -109,7 +109,17 @@ export async function iniciarAR({ visor, hud, debug, registro, contenido, motorL
     ]);
 
     ajustarLienzo();
-    XR8.run({ canvas: lienzo, allowedDevices: XR8.XrConfig.device().ANY });
+    /* sessionInitBehavior 'fallback' (leído del binario, VERIFICACIONES §8):
+       el motor manda a los navegadores llamados "Edge" por la vía WebXR
+       (regla pensada para visores), y Edge de Android anuncia immersive-ar
+       pero falla al crear la sesión ("session configuration is not
+       supported"). Con 'fallback', un session manager que no inicializa se
+       salta y se prueba el siguiente — el pipeline de cámara de siempre. */
+    XR8.run({
+      canvas: lienzo,
+      allowedDevices: XR8.XrConfig.device().ANY,
+      sessionInitBehavior: 'fallback',
+    });
 
     /* Picking por tap: el shell traduce el evento a NDC; el core raycastea. */
     lienzo.addEventListener('pointerdown', (ev) => {

@@ -103,6 +103,30 @@ const unidadesPorCm = anchoMarcadorMundo / anchoMarcadorCm;
 
 Nota de diseño de marcadores: usar targets en formato **vertical (portrait)** mantiene la normalización en el caso trivial verificado; el caso landscape sin rotar queda por confirmar en campo (F1).
 
+## 8. ⚠️ Edge (incluido Edge Android) es enviado a WebXR — y cómo se esquiva
+
+Encontrado depurando "XR8: The specified session configuration is not supported"
+en un Android con Edge. La selección de sesión en `xr.js`:
+
+```js
+og = ["Edge", "Oculus Browser"]; rg = ["Magic Leap 2"];
+if ((og.includes(navegador) || rg.includes(modelo))
+    && await navigator.xr.isSessionSupported("immersive-ar")) return "immersive-ar";
+```
+
+- Cualquier navegador cuyo UA diga "Edge" va por **WebXR** (regla pensada para
+  visores). Edge en Android responde `true` al sondeo `isSessionSupported`
+  pero **falla al crear la sesión** → el error de arriba.
+- `XR8.run` acepta **`sessionInitBehavior: 'fallback'`**: un session manager
+  que no inicializa devuelve `{initialized: false}` y el loop **prueba el
+  siguiente** (el pipeline de cámara con getUserMedia, el de Pipo), en vez de
+  lanzar `"No valid session manager to handle this session."`.
+- Existe además el override global `window._XR8MetaversalMode` (se lee antes
+  del sondeo), pero sus valores esperados son modos WebXR — no sirve para
+  DESACTIVAR la vía; no usarlo.
+
+**Implementado** en `public/app/ar-shell.js` (`XR8.run({..., sessionInitBehavior: 'fallback'})`).
+
 ---
 
 ## Estado
@@ -116,3 +140,4 @@ Nota de diseño de marcadores: usar targets en formato **vertical (portrait)** m
 | 5 | Hand tracking en binario | ✅ NO está → MediaPipe en F7 |
 | 6 | Extras de escena en export | ✅ sobreviven (Blender 5.2) |
 | 7 | Semántica de scaledWidth | ⚠️ corregida: `scale × scaledWidth` |
+| 8 | Edge → WebXR rompe en Android | ⚠️ esquivado con `sessionInitBehavior: 'fallback'` |
