@@ -442,12 +442,29 @@ tú corriges lo que haya adivinado mal"""
             if toco:
                 llenados += 1
 
+        # La emboscada del primer uso real: con una selección activa sólo se
+        # llena la selección, y las piezas de afuera se quedan con huecos sin
+        # que nadie lo diga. Se detecta y se avisa con el remedio.
+        fuera = []
+        if base:
+            fuera = [o.name for o in piezas_de(context) if o not in objetivos
+                     and not (o.jarvis_meta.pieza_id.strip()
+                              and o.jarvis_meta.pieza_nombre.strip()
+                              and o.jarvis_meta.capa.strip())]
+
         # El resultado se revisa de inmediato: el punto es dejar el linter verde.
         r = lint(context, con_geometria=False)
         context.window_manager["jarvis_lint"] = json.dumps(r, ensure_ascii=False)
         faltan = len(r["errores"])
-        self.report({"INFO"}, f"{llenados} piezas prellenadas" +
-                    (f" · quedan {faltan} errores (ver panel)" if faltan else " · linter en verde"))
+        msg = f"{llenados} piezas prellenadas"
+        if fuera:
+            msg += (f" · ⚠ {len(fuera)} con huecos FUERA de la selección "
+                    f"({', '.join(fuera[:3])}…): deselecciona todo (Alt+A) y repite")
+        elif faltan:
+            msg += f" · quedan {faltan} errores (ver panel)"
+        else:
+            msg += " · linter en verde"
+        self.report({"WARNING" if fuera else "INFO"}, msg)
         return {"FINISHED"}
 
 
