@@ -771,7 +771,10 @@ class JV_OT_export(Operator, ExportHelper):
             f"{prefs.url_visor.rstrip('/')}/api/publicar?{parametros}",
             data=datos, method="PUT",
             headers={"x-publicar-token": token,
-                     "Content-Type": "model/gltf-binary"},
+                     "Content-Type": "model/gltf-binary",
+                     # Sin UA "de navegador", el Browser Integrity Check de
+                     # Cloudflare responde 403 código 1010 al urllib pelón.
+                     "User-Agent": "jarvis-addon/1.2 (Blender)"},
         )
         try:
             with urllib.request.urlopen(peticion, timeout=300) as r:
