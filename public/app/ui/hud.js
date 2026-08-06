@@ -4,9 +4,11 @@
    Regla de rendimiento heredada: sin backdrop-filter, sin mix-blend-mode;
    sólo se animan opacity y transform. */
 
-export function crearHUD(visor, sonido = null) {
+export function crearHUD(visor, sonido = null, catalogoUrl = null) {
   const $ = (id) => document.getElementById(id);
   const el = {
+    catalogo: $('hud-catalogo'),
+    lista: $('hud-lista'),
     escala: $('hud-escala'),
     estado: $('estado'),
     slider: $('hud-explode'),
@@ -33,7 +35,68 @@ export function crearHUD(visor, sonido = null) {
     el.sonido.remove();
   }
 
-  // ── Cargar GLB: el recurso llega del usuario, no de un catálogo.
+  // ── Catálogo de piezas publicadas (queja de campo #1: el deep link por
+  //    pieza no sirve como UX primaria — la app lista lo publicado y de ahí
+  //    se carga). Sigue siendo ADITIVO: sin catálogo configurado el botón
+  //    desaparece, y si no responde, se avisa y la carga manual sigue viva.
+  if (catalogoUrl) {
+    el.catalogo.addEventListener('click', () => {
+      if (el.lista.classList.contains('visible')) {
+        el.lista.classList.remove('visible');
+        return;
+      }
+      sonido?.tick();
+      abrirCatalogo();
+    });
+  } else {
+    el.catalogo.remove();
+  }
+
+  async function abrirCatalogo() {
+    el.lista.textContent = 'Cargando catálogo…';
+    el.lista.classList.add('visible');
+    let piezas;
+    const base = new URL(catalogoUrl);
+    try {
+      const r = await fetch(new URL('piezas.json', base), { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      piezas = (await r.json()).piezas ?? [];
+    } catch (e) {
+      el.lista.textContent = `El catálogo no respondió (${e.message}). Usa ⬆ para cargar del dispositivo.`;
+      sonido?.error();
+      return;
+    }
+    el.lista.textContent = '';
+    if (!piezas.length) {
+      el.lista.textContent = 'Catálogo vacío — aún no se publica ninguna pieza.';
+      return;
+    }
+    // Lo más reciente arriba: es lo que se vino a enseñar.
+    piezas.sort((a, b) => (b.publicado ?? '').localeCompare(a.publicado ?? ''));
+    for (const p of piezas) {
+      const b = document.createElement('button');
+      b.className = 'lista-pieza';
+      const titulo = document.createElement('b');
+      titulo.textContent = p.nombre ?? p.pieza_id;
+      const detalle = document.createElement('span');
+      detalle.textContent = [p.pieza_id, p.revision, p.publicado].filter(Boolean).join(' · ');
+      b.append(titulo, detalle);
+      b.addEventListener('click', async () => {
+        el.lista.classList.remove('visible');
+        estado(`Cargando ${p.nombre ?? p.pieza_id}…`);
+        try {
+          await visor.cargar(new URL(p.modelo, base).href, p.nombre ?? p.pieza_id);
+        } catch (e) {
+          estado(`No se pudo cargar: ${e.message}`);
+          sonido?.error();
+        }
+      });
+      el.lista.appendChild(b);
+    }
+  }
+
+  // ── Cargar GLB del dispositivo: el plan B eterno — funciona sin red,
+  //    sin catálogo y sin publicar.
   el.cargar.addEventListener('click', () => el.archivo.click());
   el.archivo.addEventListener('change', async () => {
     const f = el.archivo.files?.[0];

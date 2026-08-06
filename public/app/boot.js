@@ -101,7 +101,7 @@ const portal = (() => {
 async function arrancar() {
   const visor = crearVisor(contenido);
   const sonido = crearSonido(contenido.sonido);
-  const hud = crearHUD(visor, sonido);
+  const hud = crearHUD(visor, sonido, contenido.catalogo);
   const debug = crearDebug(visor);
   crearVoz({ visor, hud, sonido }); // sin Web Speech API el botón desaparece solo
 

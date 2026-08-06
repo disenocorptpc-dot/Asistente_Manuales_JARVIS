@@ -64,14 +64,43 @@ body {
   background: var(--panel); border: 1px solid rgba(184, 143, 105, .45);
   padding: 8px 14px; border-radius: 4px;
 }
-#hud-cargar {
+#hud-catalogo {
   margin-left: auto; pointer-events: auto; cursor: pointer;
   font-size: 13px; letter-spacing: .05em;
   color: var(--perla);
   background: var(--panel); border: 1px solid var(--bronce);
-  padding: 10px 16px; border-radius: 4px;
+  padding: 10px 14px; border-radius: 4px;
 }
-#hud-cargar:active { transform: scale(.97); }
+#hud-cargar {
+  pointer-events: auto; cursor: pointer;
+  font-size: 15px;
+  color: var(--perla);
+  background: var(--panel); border: 1px solid var(--bronce);
+  padding: 10px 14px; border-radius: 4px;
+}
+#hud-catalogo:active, #hud-cargar:active { transform: scale(.97); }
+
+/* Lista del catálogo: panel bajo la barra, scrolleable, alcanzable. */
+#hud-lista {
+  position: absolute; top: calc(64px + env(safe-area-inset-top));
+  left: 16px; right: 16px; z-index: 3;
+  max-height: 55vh; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--bronce);
+  border-radius: 6px; padding: 10px;
+  display: none; flex-direction: column; gap: 8px;
+  pointer-events: auto;
+  font-size: 13px; color: var(--ligero);
+}
+#hud-lista.visible { display: flex; }
+.lista-pieza {
+  display: flex; flex-direction: column; gap: 3px; text-align: left;
+  color: var(--perla); background: rgba(37, 77, 110, .35);
+  border: 1px solid rgba(224, 229, 229, .25); border-radius: 4px;
+  padding: 11px 14px; cursor: pointer;
+}
+.lista-pieza:active { transform: scale(.99); }
+.lista-pieza b { font-size: 14px; font-weight: 600; }
+.lista-pieza span { font-size: 11px; color: var(--ligero); opacity: .75; }
 #hud-escala {
   pointer-events: auto; cursor: pointer;
   font: 700 18px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
