@@ -1,19 +1,20 @@
 {
-  // Worker del VISOR: assets estáticos. El contenido publicado (GLBs +
-  // catálogo) vive en OTRO worker (jarvis-modelos, repo JARVIS-Modelos) —
-  // publicar una pieza no toca este repo.
+  // Worker del VISOR: assets estáticos + LA ruta de publicación del equipo.
+  // PUT /api/publicar (src/worker.js) convierte un GLB en un commit atómico
+  // del repo JARVIS-Modelos vía la API de GitHub — los compañeros publican
+  // desde el addon sin git, sin clones y sin tocar este repo. Secrets del
+  // worker: PUBLICAR_TOKEN (el del equipo) y GITHUB_PAT_MODELOS (fine-grained,
+  // sólo Contents de JARVIS-Modelos).
+  // ⚠ Los secrets se montan con `wrangler secret put` y se ha visto que un
+  // deploy de la CI puede tirarlos si el worker cambia de forma: verificar
+  // con `wrangler secret list` si /api/publicar responde 503.
   //
-  // ESTACIONADO: src/worker.js trae el rail completo de publicación a R2
-  // (PUT /api/publicar + GET /modelos/ con candado de 9 GB). Se decidió no
-  // usarlo aún porque R2 exige tarjeta; el día que el repo de modelos pese
-  // demasiado, se activa R2 en el dashboard, se crea el bucket
-  // jarvis-modelos-r2 y se restaura aquí: "main": "src/worker.js" +
-  // r2_buckets [{binding: MODELOS, bucket_name: ...}]. El secret
-  // PUBLICAR_TOKEN ya está montado en el worker.
+  // (El rail anterior de R2 vive en la historia de git de src/worker.js.)
   //
   // Mismo nombre que el Worker ya desplegado en la cuenta (asistente-manuales-jarvis
   // .disenocorptpc.workers.dev) — si difiere, un deploy crearía OTRO worker.
   "name": "asistente-manuales-jarvis",
+  "main": "src/worker.js",
   "compatibility_date": "2026-08-05",
 
   "assets": {

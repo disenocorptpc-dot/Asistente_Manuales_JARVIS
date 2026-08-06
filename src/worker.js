@@ -1,168 +1,191 @@
-/* Primera ruta de código del Worker (F6 parcial: espejo a R2).
-   Hasta ahora el Worker era puro assets estáticos; esto agrega:
+/* Publicación del equipo (F6 completo): el Worker convierte un PUT de un GLB
+   en un COMMIT ATÓMICO en el repo JARVIS-Modelos vía la API de GitHub.
 
-     PUT /api/publicar?archivo=X.glb   ← el addon de Blender (F2) o
-                                          herramientas/publicar-modelo.py
-     GET /modelos/X.glb                ← el visor jala el GLB publicado
-     GET /api/modelos                  ← lista, para el catálogo futuro
+     PUT /api/publicar?archivo=X.glb&pieza_id=..&nombre=..&rev=..&autor=..
+         header x-publicar-token: <token del equipo>
 
-   Los assets estáticos siguen igual: cualquier ruta que exista en public/
-   se sirve de ahí y NUNCA llega a este código. Sólo lo que no es asset cae
-   aquí.
+   Por qué así: los compañeros modelan, no gitean. El addon manda el GLB por
+   HTTPS con el token del equipo; este Worker — con un fine-grained PAT de
+   SOLO ese repo guardado como secret — arma el commit (GLB + piezas.json
+   JUNTOS: nunca hay registro sin modelo) y la CI de Cloudflare despliega.
+   GitHub sigue siendo la fuente de verdad; el Worker no almacena nada.
 
-   Decisiones:
-   - Publicar exige un token (wrangler secret PUBLICAR_TOKEN) en el header
-     x-publicar-token. Si se filtra, se rota con `wrangler secret put` y ya.
-   - Los modelos publicados son INMUTABLES: mismo nombre dos veces = 409.
-     Cada revisión entra con otro nombre (SIG-LOBBY-01-R3.glb) — es lo que
-     permite el cache de un año, y es la disciplina que el área ya tiene
-     con los manuales. ?sobrescribir=1 existe para el error honesto.
-   - GLB ≤ 25 MB duro (el presupuesto del HANDOFF §10 es 15; el script de
-     publicación avisa a partir de ahí). */
+   Dos llaves, dos portadores:
+   - PUBLICAR_TOKEN (secret): lo que traen los addons del equipo. Sólo sirve
+     aquí, sólo publica GLBs, se rota en un minuto si se filtra.
+   - GITHUB_PAT_MODELOS (secret): sólo Contents de JARVIS-Modelos. Nunca sale
+     del Worker.
 
+   (El rail anterior de publicación a R2 vive en la historia de git de este
+   archivo — se retiró porque R2 exige tarjeta y este camino no.) */
+
+const REPO = 'disenocorptpc-dot/JARVIS-Modelos';
+const RAMA = 'main';
 const NOMBRE_VALIDO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.glb$/;
-const BYTES_MAX = 25 * 1024 * 1024;
-
-/* Candado de facturación: el free tier de R2 son 10 GB/mes y Cloudflare NO
-   ofrece tope duro nativo — así que el tope lo pone este Worker, que es lo
-   único que puede escribir. 9 GB deja margen para no rozar el límite ni con
-   el bucket lleno. Pasarse en lecturas es imposible en la práctica: el edge
-   cachea los GET y el egress de R2 es gratis por diseño. */
-const BUCKET_MAX_BYTES = 9 * 1024 * 1024 * 1024;
+const ID_VALIDO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/;
+const REV_VALIDA = /^R[0-9]{1,3}$/;
+const BYTES_MAX = 25 * 1024 * 1024; // techo duro; el presupuesto §10 es 15
 
 export default {
-  async fetch(req, env, ctx) {
+  async fetch(req, env) {
     const url = new URL(req.url);
-
-    if (url.pathname.startsWith('/modelos/')) return servirModelo(req, env, ctx, url);
     if (url.pathname === '/api/publicar') return publicar(req, env, url);
-    if (url.pathname === '/api/modelos') return listar(env);
-
     return new Response('no existe', { status: 404 });
   },
 };
 
-/* ── GET /modelos/<archivo> ──────────────────────────────────────────
-   Con cache del edge: el mismo GLB escaneado por N teléfonos en una
-   presentación sale del cache de Cloudflare, no de R2 cada vez. */
-async function servirModelo(req, env, ctx, url) {
-  if (req.method !== 'GET' && req.method !== 'HEAD')
-    return new Response('método no permitido', { status: 405 });
-
-  const archivo = decodeURIComponent(url.pathname.slice('/modelos/'.length));
-  if (!NOMBRE_VALIDO.test(archivo)) return new Response('nombre inválido', { status: 400 });
-
-  const cache = caches.default;
-  const llaveCache = new Request(url.toString()); // sin headers variables
-  const enCache = await cache.match(llaveCache);
-  if (enCache) {
-    return req.method === 'HEAD'
-      ? new Response(null, { headers: enCache.headers })
-      : enCache;
-  }
-
-  const obj = await env.MODELOS.get(archivo);
-  if (!obj) return new Response('modelo no publicado', { status: 404 });
-
-  const headers = new Headers({
-    'Content-Type': 'model/gltf-binary',
-    'Content-Length': String(obj.size),
-    // Inmutable de verdad: una revisión nueva es un nombre nuevo.
-    'Cache-Control': 'public, max-age=31536000, immutable',
-    'ETag': obj.httpEtag,
-    'X-Robots-Tag': 'noindex, nofollow, noarchive',
-  });
-
-  if (req.method === 'HEAD') return new Response(null, { headers });
-
-  const resp = new Response(obj.body, { headers });
-  ctx.waitUntil(cache.put(llaveCache, resp.clone()));
-  return resp;
-}
-
-/* ── PUT /api/publicar?archivo=<nombre>.glb ────────────────────────── */
 async function publicar(req, env, url) {
-  if (req.method !== 'PUT') return new Response('método no permitido', { status: 405 });
-  if (!env.PUBLICAR_TOKEN)
-    return json(503, { error: 'publicación sin configurar: falta el secret PUBLICAR_TOKEN' });
-
+  if (req.method !== 'PUT') return json(405, { error: 'método no permitido' });
+  if (!env.PUBLICAR_TOKEN || !env.GITHUB_PAT_MODELOS)
+    return json(503, { error: 'publicación sin configurar: faltan secrets en el Worker' });
   if (!tokenValido(req.headers.get('x-publicar-token'), env.PUBLICAR_TOKEN))
-    return json(401, { error: 'token inválido' });
+    return json(401, { error: 'token de publicación inválido' });
 
-  const archivo = url.searchParams.get('archivo') ?? '';
-  if (!NOMBRE_VALIDO.test(archivo))
-    return json(400, { error: `nombre inválido: "${archivo}" (letras/números/._- y extensión .glb)` });
+  const p = Object.fromEntries(url.searchParams);
+  if (!NOMBRE_VALIDO.test(p.archivo ?? ''))
+    return json(400, { error: `archivo inválido: "${p.archivo}" (letras/números/._- y .glb)` });
+  if (!ID_VALIDO.test(p.pieza_id ?? ''))
+    return json(400, { error: `pieza_id inválido: "${p.pieza_id}"` });
+  if (!REV_VALIDA.test(p.rev ?? ''))
+    return json(400, { error: `revisión inválida: "${p.rev}" (R1, R2…)` });
+  if (!p.nombre)
+    return json(400, { error: 'falta nombre' });
 
-  const bytes = Number(req.headers.get('content-length') ?? 0);
-  if (!bytes) return json(411, { error: 'falta Content-Length' });
-  if (bytes > BYTES_MAX)
-    return json(413, { error: `${(bytes / 1048576).toFixed(1)} MB: el techo duro es 25 MB (y el presupuesto §10 es 15)` });
+  const cuerpo = await req.arrayBuffer();
+  if (!cuerpo.byteLength) return json(400, { error: 'GLB vacío' });
+  if (cuerpo.byteLength > BYTES_MAX)
+    return json(413, { error: `${(cuerpo.byteLength / 1048576).toFixed(1)} MB: el techo duro es 25 MB` });
 
-  // Inmutabilidad: publicar encima es casi siempre un error de nombre.
-  if (!url.searchParams.has('sobrescribir')) {
-    const existente = await env.MODELOS.head(archivo);
-    if (existente)
+  const rutaGlb = `public/modelos/${p.archivo}`;
+
+  // Inmutabilidad: mismo nombre dos veces es casi siempre error de revisión.
+  if (!('sobrescribir' in p)) {
+    const existe = await fetch(`https://api.github.com/repos/${REPO}/contents/${rutaGlb}?ref=${RAMA}`,
+      { headers: cabeceras(env) });
+    if (existe.ok)
       return json(409, {
-        error: `${archivo} ya está publicado (${(existente.size / 1048576).toFixed(1)} MB). ` +
-               'Una revisión nueva lleva nombre nuevo (-R2, -R3…); si de verdad es corrección, ?sobrescribir=1.',
+        error: `${p.archivo} ya está publicado. Revisión nueva = nombre nuevo ` +
+               `(¿--rev R${Number(p.rev.slice(1)) + 1}?); si es corrección honesta, sobrescribir=1.`,
       });
   }
 
-  // Candado de facturación: si esta publicación rebasa el tope, se rechaza.
-  const enUso = await bytesEnBucket(env);
-  if (enUso + bytes > BUCKET_MAX_BYTES)
-    return json(507, {
-      error: `el bucket lleva ${(enUso / 1073741824).toFixed(2)} GB y con este archivo pasaría el tope de 9 GB ` +
-             '(candado para no salir del free tier de R2). Despublica revisiones viejas o sube el tope a conciencia.',
-    });
+  /* Commit atómico con la Git Data API. Reintento una vez si la rama se movió
+     entre leer el ref y escribirlo (dos publicaciones simultáneas). */
+  let ultimo;
+  for (let intento = 0; intento < 2; intento++) {
+    try {
+      return json(200, await commitAtomico(env, p, cuerpo, rutaGlb));
+    } catch (e) {
+      ultimo = e;
+      if (!String(e).includes('422')) break; // sólo el ref movido se reintenta
+    }
+  }
+  return json(502, { error: `GitHub no cooperó: ${ultimo}` });
+}
 
-  const obj = await env.MODELOS.put(archivo, req.body, {
-    httpMetadata: { contentType: 'model/gltf-binary' },
+async function commitAtomico(env, p, cuerpo, rutaGlb) {
+  // 1. Dónde está la rama
+  const ref = await gh(env, `/git/ref/heads/${RAMA}`);
+  const baseSha = ref.object.sha;
+  const baseCommit = await gh(env, `/git/commits/${baseSha}`);
+
+  // 2. El catálogo actual → entrada nueva/reemplazada del mismo pieza_id
+  const catRaw = await gh(env, `/contents/public/piezas.json?ref=${baseSha}`);
+  const catalogo = JSON.parse(deB64(catRaw.content));
+  const entrada = {
+    pieza_id: p.pieza_id,
+    nombre: p.nombre,
+    modelo: `modelos/${p.archivo}`,
+    revision: p.rev,
+    publicado: new Date().toISOString().slice(0, 10),
+  };
+  if (p.autor) entrada.autor = p.autor;
+  catalogo.piezas = [
+    ...(catalogo.piezas ?? []).filter((q) => q.pieza_id !== p.pieza_id),
+    entrada,
+  ].sort((a, b) => a.pieza_id.localeCompare(b.pieza_id));
+
+  // 3. Blobs → árbol → commit → mover la rama
+  const blobGlb = await gh(env, '/git/blobs', {
+    content: aB64(cuerpo), encoding: 'base64',
   });
+  const blobCat = await gh(env, '/git/blobs', {
+    content: JSON.stringify(catalogo, null, 2) + '\n', encoding: 'utf-8',
+  });
+  const arbol = await gh(env, '/git/trees', {
+    base_tree: baseCommit.tree.sha,
+    tree: [
+      { path: rutaGlb, mode: '100644', type: 'blob', sha: blobGlb.sha },
+      { path: 'public/piezas.json', mode: '100644', type: 'blob', sha: blobCat.sha },
+    ],
+  });
+  const mb = (cuerpo.byteLength / 1048576).toFixed(1);
+  const commit = await gh(env, '/git/commits', {
+    message: `publica ${p.archivo}: ${p.nombre} (${mb} MB)` +
+             (p.autor ? `\n\nPublicado por: ${p.autor} (vía Worker)` : '\n\n(vía Worker)'),
+    tree: arbol.sha,
+    parents: [baseSha],
+  });
+  await gh(env, `/git/refs/heads/${RAMA}`, { sha: commit.sha }, 'PATCH');
 
-  return json(200, {
+  return {
     ok: true,
-    archivo,
-    bytes,
-    etag: obj.httpEtag,
-    url: `${url.origin}/modelos/${archivo}`,
-    registrar: `contenido.json → piezas[]: { "pieza_id": "…", "nombre": "…", "modelo": "modelos/${archivo}" }`,
+    archivo: p.archivo,
+    bytes: cuerpo.byteLength,
+    commit: commit.sha.slice(0, 7),
+    url: `https://jarvis-modelos.disenocorptpc.workers.dev/modelos/${p.archivo}`,
+    deep_link: `https://asistente-manuales-jarvis.disenocorptpc.workers.dev/?pieza=${p.pieza_id}`,
+    nota: 'la CI despliega en ~40 s; aparecerá en el 📚 Catálogo',
+  };
+}
+
+/* ── GitHub API ──────────────────────────────────────────────────── */
+
+function cabeceras(env) {
+  return {
+    'Authorization': `Bearer ${env.GITHUB_PAT_MODELOS}`,
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'jarvis-publicador',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+}
+
+async function gh(env, ruta, cuerpo = null, metodo = null) {
+  const r = await fetch(`https://api.github.com/repos/${REPO}${ruta}`, {
+    method: metodo ?? (cuerpo ? 'POST' : 'GET'),
+    headers: { ...cabeceras(env), ...(cuerpo ? { 'Content-Type': 'application/json' } : {}) },
+    body: cuerpo ? JSON.stringify(cuerpo) : undefined,
   });
+  if (!r.ok)
+    throw new Error(`${r.status} en ${ruta}: ${(await r.text()).slice(0, 180)}`);
+  return r.json();
 }
 
-/* ── GET /api/modelos ──────────────────────────────────────────────── */
-async function listar(env) {
-  const lista = await env.MODELOS.list({ limit: 500 });
-  return json(200, {
-    modelos: lista.objects.map((o) => ({
-      archivo: o.key,
-      mb: +(o.size / 1048576).toFixed(2),
-      publicado: o.uploaded,
-    })),
-  });
+/* base64 de un ArrayBuffer por bloques — un GLB de 25 MB no cabe en un
+   String.fromCharCode(...todo) de un jalón. */
+function aB64(buf) {
+  const bytes = new Uint8Array(buf);
+  const paso = 0x8000;
+  let s = '';
+  for (let i = 0; i < bytes.length; i += paso)
+    s += String.fromCharCode(...bytes.subarray(i, i + paso));
+  return btoa(s);
 }
 
-/* Suma el tamaño de todo lo publicado. A la escala del área son decenas de
-   objetos; el loop de cursor está por si algún día son miles. */
-async function bytesEnBucket(env) {
-  let total = 0;
-  let cursor;
-  do {
-    const pagina = await env.MODELOS.list({ limit: 1000, cursor });
-    for (const o of pagina.objects) total += o.size;
-    cursor = pagina.truncated ? pagina.cursor : undefined;
-  } while (cursor);
-  return total;
+/* El content de la API viene en base64 con saltos de línea, y trae UTF-8:
+   atob a bytes y TextDecoder — atob directo destroza los acentos. */
+function deB64(contenido) {
+  const bin = atob(contenido.replace(/\n/g, ''));
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
 }
 
-/* Comparación en tiempo constante cuando la plataforma la da; si no,
-   igualdad simple — el token es aleatorio de 32 bytes, no una contraseña. */
 function tokenValido(recibido, esperado) {
   if (!recibido || recibido.length !== esperado.length) return false;
   try {
-    const codificar = (s) => new TextEncoder().encode(s);
+    const cod = (s) => new TextEncoder().encode(s);
     return crypto.subtle.timingSafeEqual
-      ? crypto.subtle.timingSafeEqual(codificar(recibido), codificar(esperado))
+      ? crypto.subtle.timingSafeEqual(cod(recibido), cod(esperado))
       : recibido === esperado;
   } catch {
     return recibido === esperado;

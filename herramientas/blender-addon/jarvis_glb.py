@@ -51,7 +51,7 @@ from mathutils import Vector
 bl_info = {
     "name": "JARVIS — GLB con contrato (Palace)",
     "author": "Coordinación de Diseño Industrial y 3D — The Palace Company",
-    "version": (1, 1, 4),
+    "version": (1, 2, 0),
     "blender": (4, 2, 0),
     "location": "Propiedades > Objeto / Escena · File > Export > GLB JARVIS",
     "description": "Metadata de producción + linter que bloquea + export GLB "
@@ -702,14 +702,23 @@ class JV_OT_export(Operator, ExportHelper):
         if self.publicar:
             # Escalares, no el PropertyGroup: tras ocultar/restaurar, el
             # wrapper viejo no es de fiar.
-            return self._publicar(context, v_pieza_id, v_pieza_nombre, v_revision)
+            return self._publicar(context, v_pieza_id, v_pieza_nombre, v_revision, v_autor)
         return {"FINISHED"}
 
-    def _publicar(self, context, pieza_id, pieza_nombre, revision):
+    def _publicar(self, context, pieza_id, pieza_nombre, revision, autor):
         # Corriendo como script suelto (headless, pruebas) el addon no está en
         # preferences.addons — degradar avisando, no tronar.
         entrada = context.preferences.addons.get(__name__)
-        repo = entrada.preferences.repo_codigo if entrada else ""
+        if entrada is None:
+            self.report({"WARNING"}, "GLB exportado; publicar necesita el addon "
+                                     "instalado con preferencias")
+            return {"FINISHED"}
+        prefs = entrada.preferences
+
+        if prefs.publicar_via == "remoto":
+            return self._publicar_remoto(prefs, pieza_id, pieza_nombre, revision, autor)
+
+        repo = prefs.repo_codigo
         script = Path(repo) / "herramientas" / "publicar-modelo.py"
         if not repo or not script.exists():
             self.report({"WARNING"},
@@ -737,35 +746,115 @@ class JV_OT_export(Operator, ExportHelper):
             self.report({"INFO"}, cola[-2] if len(cola) > 1 else "Publicado")
         return {"FINISHED"}
 
+    def _publicar_remoto(self, prefs, pieza_id, pieza_nombre, revision, autor):
+        """El modo del equipo: PUT del GLB al Worker, que hace el commit en
+        GitHub y la CI despliega. Sin git en esta máquina."""
+        import urllib.error
+        import urllib.parse
+        import urllib.request
+
+        token = prefs.token_publicacion.strip()
+        if not token:
+            self.report({"WARNING"}, "GLB exportado; falta el token del equipo "
+                                     "en las preferencias del addon")
+            return {"FINISHED"}
+
+        datos = Path(self.filepath).read_bytes()
+        parametros = urllib.parse.urlencode({
+            "archivo": f"{pieza_id}-{revision}.glb",
+            "pieza_id": pieza_id,
+            "nombre": pieza_nombre,
+            "rev": revision,
+            "autor": autor or Path.home().name,
+        })
+        peticion = urllib.request.Request(
+            f"{prefs.url_visor.rstrip('/')}/api/publicar?{parametros}",
+            data=datos, method="PUT",
+            headers={"x-publicar-token": token,
+                     "Content-Type": "model/gltf-binary"},
+        )
+        try:
+            with urllib.request.urlopen(peticion, timeout=300) as r:
+                resp = json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            try:
+                detalle = json.loads(e.read()).get("error", "")
+            except Exception:  # noqa: BLE001
+                detalle = ""
+            self.report({"WARNING"}, f"Export OK pero publicar falló "
+                                     f"(HTTP {e.code}): {detalle or e.reason}")
+            return {"FINISHED"}
+        except Exception as e:  # noqa: BLE001 — sin red, DNS, timeout…
+            self.report({"WARNING"}, f"Export OK pero no llegué al servidor: {e}")
+            return {"FINISHED"}
+
+        self.report({"INFO"}, f"Publicado ({resp.get('commit', '?')}) — "
+                              "aparecerá en el 📚 Catálogo en ~1 min")
+        return {"FINISHED"}
+
 
 class JV_Preferencias(AddonPreferences):
     bl_idname = __name__
 
+    publicar_via: EnumProperty(
+        name="Publicar vía",
+        items=[
+            ("remoto", "Servidor del equipo",
+             "El addon manda el GLB por HTTPS al Worker del visor con el token "
+             "del equipo; el servidor hace el commit y despliega. Sin git, sin "
+             "clones — el modo para todo el equipo"),
+            ("local", "Repos locales (avanzado)",
+             "Corre publicar-modelo.py con los dos repos clonados en esta "
+             "máquina y credenciales de git propias"),
+        ],
+        default="remoto",
+    )
+    token_publicacion: StringProperty(
+        name="Token del equipo",
+        description="La clave de publicación que te pasó la coordinación. "
+                    "Sólo sirve contra el Worker del visor y sólo publica GLBs",
+        subtype="PASSWORD",
+        default="",
+    )
+    url_visor: StringProperty(
+        name="URL del visor",
+        default="https://asistente-manuales-jarvis.disenocorptpc.workers.dev",
+    )
     repo_codigo: StringProperty(
         name="Carpeta LOCAL del repo del visor",
-        description="La carpeta en tu disco donde está clonado "
-                    "Asistente_Manuales_JARVIS (NO la URL de GitHub). El botón "
-                    "publicar corre herramientas/publicar-modelo.py de ahí, y "
-                    "espera el clon de JARVIS-Modelos como carpeta hermana",
+        description="Sólo para el modo avanzado: la carpeta donde está clonado "
+                    "Asistente_Manuales_JARVIS (NO la URL de GitHub), con "
+                    "JARVIS-Modelos como carpeta hermana",
         subtype="DIR_PATH",
         default="",
     )
 
     def draw(self, context):
         col = self.layout.column()
-        col.prop(self, "repo_codigo")
-        ruta = Path(self.repo_codigo) if self.repo_codigo else None
-        if not self.repo_codigo:
-            col.label(text="Elige la CARPETA del clon (icono de folder), no la URL de GitHub.",
-                      icon="INFO")
-        elif not (ruta / "herramientas" / "publicar-modelo.py").exists():
-            col.label(text="Ahí no veo herramientas/publicar-modelo.py — ¿es la carpeta correcta?",
-                      icon="ERROR")
-        elif not (ruta.parent / "JARVIS-Modelos" / "public" / "piezas.json").exists():
-            col.label(text="Falta el clon hermano JARVIS-Modelos junto a esta carpeta.",
-                      icon="ERROR")
+        col.prop(self, "publicar_via")
+        if self.publicar_via == "remoto":
+            col.prop(self, "token_publicacion")
+            col.prop(self, "url_visor")
+            if not self.token_publicacion.strip():
+                col.label(text="Pega el token del equipo — sin él, el botón "
+                               "publicar no puede autenticarse.", icon="INFO")
+            else:
+                col.label(text="Listo: exporta con ✓ Publicar y la pieza cae al catálogo.",
+                          icon="CHECKMARK")
         else:
-            col.label(text="Listo: script y repo de modelos encontrados.", icon="CHECKMARK")
+            col.prop(self, "repo_codigo")
+            ruta = Path(self.repo_codigo) if self.repo_codigo else None
+            if not self.repo_codigo:
+                col.label(text="Elige la CARPETA del clon (icono de folder), no la URL.",
+                          icon="INFO")
+            elif not (ruta / "herramientas" / "publicar-modelo.py").exists():
+                col.label(text="Ahí no veo herramientas/publicar-modelo.py — ¿carpeta correcta?",
+                          icon="ERROR")
+            elif not (ruta.parent / "JARVIS-Modelos" / "public" / "piezas.json").exists():
+                col.label(text="Falta el clon hermano JARVIS-Modelos junto a esta carpeta.",
+                          icon="ERROR")
+            else:
+                col.label(text="Listo: script y repo de modelos encontrados.", icon="CHECKMARK")
 
 
 def menu_export(self, context):
