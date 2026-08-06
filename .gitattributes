@@ -1,0 +1,8 @@
+# Los binarios NUNCA pasan por conversión de fin de línea: git trató el PDF
+# de la guía como texto (autodetección fallida) y un checkout con autocrlf
+# podría corromperlo. Se salvó de suerte; esto lo vuelve determinista.
+*.pdf  binary
+*.glb  binary
+*.png  binary
+*.webp binary
+*.ico  binary
