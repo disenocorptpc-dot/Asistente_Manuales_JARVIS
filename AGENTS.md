@@ -158,8 +158,22 @@ python -m http.server 8317 --directory public
   marcador, carga de GLB, explota/arma, órbita, mic, éxito/error de voz, y
   tick en cada toggle. Botón 🔇 persistente en localStorage
   (`jarvis_sonido`); volumen master en `contenido.json`.
-- F2 — addon de Blender (metadata + linter). F3 — HUD hi-tech completo.
-  F4 — captura + deep links. F5–F7 — ver HANDOFF §12.
+- **F2 ✅ addon de Blender** (`herramientas/blender-addon/jarvis_glb.py`,
+  probado con `probar_addon.py`: 24 checks headless + carga en el visor).
+  Paneles de Objeto/Escena con el contrato §6 en claves individuales, LINTER
+  QUE BLOQUEA (unidades, ids, capa, presupuestos §10, texturas >2048),
+  export Draco automático (el visor ya trae DRACOLoader en `core/loader.js`,
+  decoder del mismo three clavado), y botón «Publicar al visor» que corre
+  publicar-modelo.py (ruta del repo en las preferencias del addon).
+  Arquitectura reciclada de glb_manuales_addon (otro proyecto, otro
+  contrato — aquel repo no se toca). Dos trampas aprendidas a golpes:
+  (1) el exportador glTF vuelca las system properties a extras, así que la
+  PropertyGroup saldría duplicada — se oculta con
+  `bl_system_properties_get()` y se restaura del respaldo; (2) leer un
+  PropertyGroup cuyo respaldo se borró es puntero colgante y Blender
+  REVIENTA (ACCESS_VIOLATION) — todo se lee a escalares ANTES de ocultar.
+- F3 — HUD hi-tech completo. F4 — captura + deep links (el deep link ya
+  existe; falta QR y captura). F5 — falta Whisper. F7 — gestos.
 
 ## Marcadores: cómo generar y compilar uno nuevo
 

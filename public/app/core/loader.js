@@ -8,11 +8,21 @@
    degradar avisando, nunca cargar mal en silencio. */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 const ANCLAJES = new Set(['base_centro', 'centro_geometrico', 'punto_named']);
 
+/* El addon (F2) comprime con Draco al exportar — sin el decoder registrado,
+   GLTFLoader truena con "No DRACOLoader instance provided". El decoder (wasm)
+   viene del MISMO paquete de three clavado en el importmap: una sola versión
+   que subir cuando toque. Un GLB sin comprimir carga igual: el decoder sólo
+   se usa si el archivo trae la extensión. */
+const draco = new DRACOLoader()
+  .setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
+const cargador = new GLTFLoader().setDRACOLoader(draco);
+
 export async function cargarPieza(url, nombreArchivo = '') {
-  const gltf = await new GLTFLoader().loadAsync(url);
+  const gltf = await cargador.loadAsync(url);
   const modelo = gltf.scene;
   const meta = modelo.userData ?? {};
   const avisos = [];
