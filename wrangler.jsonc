@@ -1,0 +1,21 @@
+{
+  // Worker de puros assets estáticos: no hay código de servidor todavía.
+  // Cuando llegue F6 (proxy de SharePoint) se agrega "main" con la ruta
+  // /api/model/:id — misma unidad de deploy, por eso Worker y no Pages.
+  "name": "jarvis-visor-ar",
+  "compatibility_date": "2026-08-05",
+
+  "assets": {
+    "directory": "./public",
+    // 404 normal para rutas que no existen. NO es una SPA: con
+    // "single-page-application" cualquier ruta mala devolvería el index
+    // con status 200 y los errores se volverían invisibles.
+    "not_found_handling": "none"
+  },
+
+  "observability": {
+    // Logs desde el prototipo: cuántos escanean, qué piezas abren,
+    // dónde abandonan. Es el argumento presupuestal de la fase 2.
+    "enabled": true
+  }
+}

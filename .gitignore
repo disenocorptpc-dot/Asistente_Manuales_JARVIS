@@ -1,0 +1,39 @@
+# ── Material fuente ──────────────────────────────────────────────────
+# Masters pesados (FBX de intercambio, .blend, PSD) viven en la carpeta
+# de trabajo pero NO en el repo — GitHub corta en 100 MB. Lo publicable
+# ya está en public/models, comprimido y con nombre de versión.
+#
+# Ojo con el alcance: la diagonal inicial ancla el patrón a la RAÍZ,
+# así que public/models/*.glb SÍ se sube. Sin ella se ignorarían también.
+/*.pdf
+/*.mp4
+/*.jpg
+/*.jpeg
+/*.png
+/*.webp
+/*.psd
+/*.ai
+/*.blend
+/*.blend1
+/*.fbx
+/*.obj
+/*.gltf
+/*.glb
+
+# ── Basura de sistema ────────────────────────────────────────────────
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ── Nunca, jamás ─────────────────────────────────────────────────────
+*.token
+.env
+.dev.vars
+
+# Datos crudos intermedios del compilador de marcadores
+*.rgba
+
+# Dependencias de las herramientas y archivos intermedios
+herramientas/node_modules/
+herramientas/_*
+herramientas/package-lock.json

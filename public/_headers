@@ -1,0 +1,19 @@
+# robots.txt es una cortesía que los buscadores pueden ignorar; X-Robots-Tag no.
+/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+  Referrer-Policy: no-referrer
+
+# Los modelos son inmutables: cada revisión entra con otro nombre de archivo
+# (SIG-LOBBY-01-R3.glb). Cachear agresivo es justo lo que el 4G necesita.
+/models/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# El target compilado cambia sólo cuando cambia el arte del marcador.
+/image-targets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Lo que sí cambia, que no se quede pegado.
+/contenido.json
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache

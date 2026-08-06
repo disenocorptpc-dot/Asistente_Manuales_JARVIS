@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>JARVIS · Visor 3D AR — The Palace Company</title>
+<meta name="theme-color" content="#254D6E">
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     Motor de 8th Wall (open source). Versión EXACTA clavada a propósito:
+     un QR impreso no puede depender de un @1 flotante. Para subir de
+     versión: cambiar aquí, probar en teléfono, commitear.
+     Licencia limited-use del binario: uso comercial permitido, sin
+     redistribuir modificado. PENDIENTE antes de escalar: revisión legal.
+     ═══════════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1.0.0/dist/xr.js" async crossorigin="anonymous"></script>
+
+<link rel="stylesheet" href="app/ui/hud.css">
+<style>
+  /* Debug: estilos mínimos aquí para que el panel exista aunque el HUD falle. */
+  #debug{
+    position:fixed;top:calc(10px + env(safe-area-inset-top));left:10px;z-index:9;
+    display:none;flex-direction:column;gap:7px;align-items:flex-start;
+    font:11.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;
+    color:#ffd9a8;background:rgba(0,0,0,.78);
+    padding:10px 12px;border-radius:8px;pointer-events:auto;
+    border:1px solid rgba(255,217,168,.3);max-width:74vw;
+  }
+  #debug.on{display:flex}
+  #debug .cab{display:flex;gap:10px;align-items:center;width:100%}
+  #dbg-toggle{margin-left:auto;min-width:26px;font:10.5px ui-monospace,monospace;
+    color:#0b1410;background:#ffd9a8;border:0;border-radius:5px;padding:5px 8px;cursor:pointer}
+  #dbg-info{white-space:pre}
+  #debug.min #dbg-info{display:none}
+</style>
+</head>
+<body>
+
+<canvas id="lienzo"></canvas>
+
+<div id="hud">
+  <div id="hud-arriba">
+    <span id="hud-titulo">…</span>
+    <button id="hud-escala" title="Cambiar escala">1:1</button>
+  </div>
+  <p id="estado">Cargando…</p>
+  <div id="hud-coaching">Ponte más de frente al marcador</div>
+  <div id="hud-ficha"></div>
+  <div id="hud-abajo">
+    <div id="hud-capas"></div>
+    <div id="hud-explode-caja">
+      <label for="hud-explode">Despiece</label>
+      <input id="hud-explode" type="range" min="0" max="100" value="0">
+    </div>
+  </div>
+</div>
+
+<div id="debug" class="min">
+  <div class="cab">
+    <span id="dbg-mini">cargando…</span>
+    <button id="dbg-toggle">＋</button>
+  </div>
+  <div id="dbg-info"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="app/boot.js"></script>
+</body>
+</html>
