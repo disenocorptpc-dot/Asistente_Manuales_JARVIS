@@ -51,7 +51,7 @@ from mathutils import Vector
 bl_info = {
     "name": "JARVIS — GLB con contrato (Palace)",
     "author": "Coordinación de Diseño Industrial y 3D — The Palace Company",
-    "version": (1, 1, 3),
+    "version": (1, 1, 4),
     "blender": (4, 2, 0),
     "location": "Propiedades > Objeto / Escena · File > Export > GLB JARVIS",
     "description": "Metadata de producción + linter que bloquea + export GLB "
@@ -725,6 +725,9 @@ class JV_OT_export(Operator, ExportHelper):
              "--rev", revision],
             capture_output=True, text=True, timeout=600,
             cwd=str(repo),
+            # El script emite UTF-8 (se reconfigura solo); decodificar igual,
+            # o los ✔/⚠ del reporte se vuelven mojibake en Windows.
+            encoding="utf-8", errors="replace",
         )
         cola = (r.stdout + r.stderr).strip().splitlines()
         if r.returncode != 0:

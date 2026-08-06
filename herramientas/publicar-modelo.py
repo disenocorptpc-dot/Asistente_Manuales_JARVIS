@@ -31,6 +31,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+# La consola de Windows (cp1252) no conoce ✔/⚠ y el print final REVENTABA
+# después de publicar bien — el peor tipo de error: éxito reportado como
+# falla. UTF-8 a fuerza, con reemplazo si aun así algo no cabe.
+for _flujo in (sys.stdout, sys.stderr):
+    try:
+        _flujo.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, ValueError):
+        pass
+
 MB = 1024 * 1024
 ID_VALIDO = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$')
 REV_VALIDA = re.compile(r'^R[0-9]{1,3}$')
