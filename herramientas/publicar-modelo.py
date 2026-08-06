@@ -59,6 +59,9 @@ def main():
     p.add_argument('--repo', default=None, help='ruta del repo JARVIS-Modelos (default: hermano de éste)')
     p.add_argument('--ya', action='store_true',
                    help='además del push, wrangler deploy directo: en línea en segundos, sin esperar la CI')
+    p.add_argument('--sobrescribir', action='store_true',
+                   help='reemplaza una revisión ya publicada (corrección honesta, no versionado; '
+                        'el cache inmutable puede servir la vieja hasta un año)')
     a = p.parse_args()
 
     if not ID_VALIDO.match(a.id):
@@ -82,8 +85,9 @@ def main():
 
     archivo = f'{a.id}-{a.rev}.glb'
     destino = repo / 'public' / 'modelos' / archivo
-    if destino.exists():
-        sys.exit(f'{archivo} ya está publicado. Una revisión nueva lleva nombre nuevo (¿--rev R{int(a.rev[1:])+1}?).')
+    if destino.exists() and not a.sobrescribir:
+        sys.exit(f'{archivo} ya está publicado. Una revisión nueva lleva nombre nuevo '
+                 f'(¿--rev R{int(a.rev[1:])+1}?); para corrección honesta, --sobrescribir.')
 
     # 1-2. copiar
     shutil.copyfile(origen, destino)

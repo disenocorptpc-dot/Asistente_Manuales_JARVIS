@@ -51,7 +51,7 @@ from mathutils import Vector
 bl_info = {
     "name": "JARVIS — GLB con contrato (Palace)",
     "author": "Coordinación de Diseño Industrial y 3D — The Palace Company",
-    "version": (1, 2, 0),
+    "version": (1, 2, 1),
     "blender": (4, 2, 0),
     "location": "Propiedades > Objeto / Escena · File > Export > GLB JARVIS",
     "description": "Metadata de producción + linter que bloquea + export GLB "
@@ -511,10 +511,17 @@ class JV_OT_export(Operator, ExportHelper):
     )
     publicar: BoolProperty(
         name="Publicar al visor",
-        description="Corre herramientas/publicar-modelo.py al terminar: "
-                    "copia al repo de modelos, registra en el catálogo y "
-                    "despliega. Configura la ruta del repo en las "
-                    "preferencias del addon",
+        description="Al terminar, sube la pieza al catálogo del equipo "
+                    "(configura token o repos en las preferencias del addon)",
+        default=False,
+    )
+    sobrescribir: BoolProperty(
+        name="Reemplazar la revisión ya publicada",
+        description="Normalmente NO: un cambio real merece subir la Revisión "
+                    "(R1 a R2) en el panel de Escena. Esto es para corregir "
+                    "una publicación equivocada reutilizando el mismo nombre "
+                    "— ojo: quien ya la haya visto puede seguir viendo la "
+                    "vieja por cache hasta un año",
         default=False,
     )
 
@@ -528,6 +535,9 @@ class JV_OT_export(Operator, ExportHelper):
         col = self.layout.column()
         col.prop(self, "comprimir")
         col.prop(self, "publicar")
+        sub = col.column()
+        sub.enabled = self.publicar
+        sub.prop(self, "sobrescribir")
         # Chequeo BARATO en el diálogo (sin evaluar geometría — eso jankea el
         # repintado). El conteo real de triángulos corre al confirmar.
         r = lint(context, con_geometria=False)
@@ -727,11 +737,12 @@ class JV_OT_export(Operator, ExportHelper):
             return {"FINISHED"}
         # sys.executable en Blender es su Python embebido; el script sólo usa
         # stdlib + git/npx del PATH, así que corre tal cual.
+        args = [sys.executable, str(script), self.filepath,
+                "--id", pieza_id, "--nombre", pieza_nombre, "--rev", revision]
+        if self.sobrescribir:
+            args.append("--sobrescribir")
         r = subprocess.run(
-            [sys.executable, str(script), self.filepath,
-             "--id", pieza_id,
-             "--nombre", pieza_nombre,
-             "--rev", revision],
+            args,
             capture_output=True, text=True, timeout=600,
             cwd=str(repo),
             # El script emite UTF-8 (se reconfigura solo); decodificar igual,
@@ -760,13 +771,16 @@ class JV_OT_export(Operator, ExportHelper):
             return {"FINISHED"}
 
         datos = Path(self.filepath).read_bytes()
-        parametros = urllib.parse.urlencode({
+        campos = {
             "archivo": f"{pieza_id}-{revision}.glb",
             "pieza_id": pieza_id,
             "nombre": pieza_nombre,
             "rev": revision,
             "autor": autor or Path.home().name,
-        })
+        }
+        if self.sobrescribir:
+            campos["sobrescribir"] = "1"
+        parametros = urllib.parse.urlencode(campos)
         peticion = urllib.request.Request(
             f"{prefs.url_visor.rstrip('/')}/api/publicar?{parametros}",
             data=datos, method="PUT",
@@ -784,8 +798,18 @@ class JV_OT_export(Operator, ExportHelper):
                 detalle = json.loads(e.read()).get("error", "")
             except Exception:  # noqa: BLE001
                 detalle = ""
-            self.report({"WARNING"}, f"Export OK pero publicar falló "
-                                     f"(HTTP {e.code}): {detalle or e.reason}")
+            if e.code == 409:
+                # Traducido a idioma Blender: el 409 del worker habla en
+                # jerga de CLI y confundió en campo.
+                self.report({"WARNING"},
+                            f"La revisión {revision} de {pieza_id} YA está publicada. "
+                            "Si cambiaste la pieza: sube la Revisión en el panel de "
+                            "Escena (p. ej. R2) y vuelve a exportar. Si quieres "
+                            "reemplazarla tal cual: prende «Reemplazar la revisión "
+                            "ya publicada» en el diálogo de export.")
+            else:
+                self.report({"WARNING"}, f"Export OK pero publicar falló "
+                                         f"(HTTP {e.code}): {detalle or e.reason}")
             return {"FINISHED"}
         except Exception as e:  # noqa: BLE001 — sin red, DNS, timeout…
             self.report({"WARNING"}, f"Export OK pero no llegué al servidor: {e}")
