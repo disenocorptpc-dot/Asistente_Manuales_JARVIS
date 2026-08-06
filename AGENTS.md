@@ -248,6 +248,28 @@ el GLB + su entrada en `piezas.json` viajan en el mismo commit (atómico).
   montado en el worker del visor y el token local en
   `herramientas/.publicar.token` (gitignored).
 
+## Publicación del equipo por HTTP (F6 completo, 2026-08-06)
+
+Los compañeros NO usan git. El addon (modo "Servidor del equipo", el default)
+manda el GLB por HTTPS a `PUT /api/publicar` del worker del visor con el
+**token del equipo** (`herramientas/.publicar.token`, secret PUBLICAR_TOKEN);
+`src/worker.js` arma un **commit atómico** en JARVIS-Modelos vía la Git Data
+API de GitHub (GLB + piezas.json juntos, reintento si la rama se movió) usando
+el secret GITHUB_PAT_MODELOS (fine-grained, sólo Contents de ese repo, nunca
+sale del worker). La CI despliega y la pieza cae al 📚 Catálogo de la app.
+
+Kit de un compañero nuevo: `jarvis_glb.py` (Install from Disk) + pegar el
+token del equipo en las preferencias. Nada más. E2E verificado: commit
+1acc98a hecho por el worker.
+
+Trampas pagadas: (1) el Browser Integrity Check de Cloudflare responde
+**403/1010** a un urllib sin User-Agent — el addon manda `jarvis-addon/...`;
+(2) se ha visto a los deploys de la CI **tirar los secrets** del worker — si
+/api/publicar responde 503, `wrangler secret list` y reponer (el token del
+equipo está en `.publicar.token`; el PAT hay que regenerarlo en GitHub).
+El modo local (script + clones + credencial enjaulada) sigue vivo como
+camino avanzado.
+
 ## ⚠️ Un push a `main` es un deploy a producción
 
 El repo está conectado a **Cloudflare Workers Builds** — la CI de Cloudflare, no
