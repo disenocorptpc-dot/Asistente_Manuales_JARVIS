@@ -32,6 +32,10 @@ export function emparejar(texto, capas = []) {
   if (tiene('explota', 'explotado', 'explosion', 'despiece', 'desarma')) return { accion: 'explotar', arg: 1 };
   if (tiene('arma', 'cierra', 'junta')) return { accion: 'explotar', arg: 0 };
 
+  // Origen: todo a su estado de inicio. VA ANTES que la órbita porque
+  // «reinicia» no debe caer en las palabras de girar.
+  if (tiene('origen', 'reinicia', 'restaura', 'inicio')) return { accion: 'origen' };
+
   // Órbita (turntable)
   if (tiene('orbita', 'gira', 'rota')) return { accion: 'orbita', arg: true };
   if (tiene('alto', 'quieto', 'para', 'detente', 'stop')) return { accion: 'orbita', arg: false };
@@ -75,6 +79,16 @@ export function crearVoz({ visor, hud, sonido = null }) {
         if (orden.arg) visor.orbita.iniciar(); else visor.orbita.detener();
         sonido?.orbita(orden.arg);
         return orden.arg ? 'orbitando' : 'quieta';
+      case 'origen': {
+        // Estado de inicio: órbita detenida Y de frente (parar deja la pieza
+        // en un ángulo aleatorio), despiece cerrado, escala de arranque.
+        const habiaDespiece = (visor.explotado?.factor ?? 0) > 0;
+        visor.orbita.reiniciar();
+        if (visor.cargado) visor.explotar(0, 0.8);
+        hud.escalaA(visor.escala.inicial);
+        if (habiaDespiece) sonido?.arma(); else sonido?.exito();
+        return 'al origen';
+      }
       case 'escala':
         sonido?.exito();
         return `escala ${hud.escalaA(orden.arg)}`;

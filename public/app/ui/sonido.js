@@ -98,19 +98,20 @@ export function crearSonido(opciones = {}) {
       [523, 784, 1047].forEach((f, i) => tono({ f0: f, dur: 0.14, retraso: i * 0.07 }));
       tono({ f0: 2093, dur: 0.3, vol: 0.15, retraso: 0.2 });
     },
-    perdida() { // marcador fuera de cuadro: doble nota descendente, discreta
-      tono({ f0: 520, f1: 380, dur: 0.12, vol: 0.35 });
-      tono({ f0: 380, f1: 300, dur: 0.15, vol: 0.3, retraso: 0.13 });
-    },
+    /* El sonido de pérdida de encuadre SE QUITÓ (campo, ronda #3): imagelost
+       dispara a cada rato con el protocolo "engancha y retrocede" y el
+       doble beep taladraba. La pérdida se comunica sólo por texto del HUD. */
+    perdida() {},
     carga: () => // GLB listo: power-up de cuatro notas
       [392, 523, 659, 880].forEach((f, i) => tono({ f0: f, dur: 0.12, vol: 0.45, retraso: i * 0.08 })),
-    explota() { // whoosh que abre + golpe grave de fondo
-      soplo({ dur: 0.6, desde: 250, hasta: 2400, vol: 0.7 });
-      tono({ f0: 90, f1: 50, dur: 0.25, tipo: 'triangle', vol: 0.6 });
+    explota() { // whoosh que abre + golpe grave — MÁS fuerte (campo, ronda #3)
+      soplo({ dur: 0.7, desde: 220, hasta: 2600, vol: 1.0 });
+      tono({ f0: 100, f1: 45, dur: 0.35, tipo: 'triangle', vol: 0.95 });
+      tono({ f0: 1320, f1: 1980, dur: 0.12, vol: 0.4, retraso: 0.05 }); // chispa arriba, se oye en bocina chica
     },
     arma() {    // whoosh inverso + clac al asentar
-      soplo({ dur: 0.5, desde: 2000, hasta: 220, vol: 0.55 });
-      tono({ f0: 740, f1: 1100, dur: 0.08, vol: 0.4, retraso: 0.45 });
+      soplo({ dur: 0.55, desde: 2200, hasta: 200, vol: 0.85 });
+      tono({ f0: 740, f1: 1100, dur: 0.09, vol: 0.6, retraso: 0.5 });
     },
     orbita: (encendida) => encendida
       ? tono({ f0: 300, f1: 600, dur: 0.25, tipo: 'triangle', vol: 0.35 })

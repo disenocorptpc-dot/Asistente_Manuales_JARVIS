@@ -36,6 +36,7 @@ export function crearEscala(grafo, config) {
   return {
     get modo() { return modo; },
     get modos() { return Object.keys(modos); }, // en el orden de contenido.json
+    get inicial() { return config?.default ?? '1:1'; }, // para el comando «origen»
     get unidadesPorMetro() { return unidadesPorMetro; },
     get lista() { return !!unidadesPorMetro; },
 
