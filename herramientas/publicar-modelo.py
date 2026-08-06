@@ -7,14 +7,14 @@ Qué hace, en orden:
   2. Copia el GLB a JARVIS-Modelos/public/modelos/<ID>-<REV>.glb.
   3. Registra/actualiza la pieza en public/piezas.json — GLB y registro viajan
      en el MISMO commit: nunca hay registro sin modelo ni modelo sin registro.
-  4. Commit en el repo de modelos (y push si hay credenciales; si no, avisa —
-     el push es historia/respaldo, no publicación).
-  5. `wrangler deploy` — ESTE es el acto de publicar: el worker jarvis-modelos
-     sirve el contenido al visor.
+  4. Commit + PUSH — **el push ES la publicación**: el repo está conectado a
+     Workers Builds y la CI de Cloudflare despliega solo (~40 s). GitHub es la
+     fuente de verdad, como se acordó.
+  5. Con --ya, además corre `wrangler deploy` directo: la pieza queda en línea
+     en segundos sin esperar la CI (y sirve de plan B si el push no puede).
 
 El repo de modelos se asume hermano de éste (../JARVIS-Modelos); --repo para
-otra ruta. Éste es el rail que usará el botón "Exportar y publicar" del addon
-de Blender (F2).
+otra ruta. Éste es el rail del botón "Exportar y publicar" del addon (F2).
 
 Reglas que no se negocian:
 - Los publicados son INMUTABLES: revisión nueva = nombre nuevo (-R1, -R2…).
@@ -48,7 +48,8 @@ def main():
     p.add_argument('--nombre', required=True, help='nombre legible para el catálogo')
     p.add_argument('--rev', required=True, help='revisión: R1, R2, …')
     p.add_argument('--repo', default=None, help='ruta del repo JARVIS-Modelos (default: hermano de éste)')
-    p.add_argument('--sin-deploy', action='store_true', help='commitea pero no despliega (para agrupar varias piezas)')
+    p.add_argument('--ya', action='store_true',
+                   help='además del push, wrangler deploy directo: en línea en segundos, sin esperar la CI')
     a = p.parse_args()
 
     if not ID_VALIDO.match(a.id):
@@ -99,22 +100,29 @@ def main():
     if c != 0:
         sys.exit(f'git commit falló:\n{salida}')
     c, salida = correr(['git', 'push'], repo)
-    if c != 0:
-        print('⚠ push falló (¿sin credenciales?). El commit quedó local — pushea cuando puedas; '
-              'es respaldo/historia, la publicación es el deploy.')
+    push_ok = c == 0
+    if not push_ok and not a.ya:
+        ultima = salida.splitlines()[-1] if salida else ''
+        sys.exit('✗ push falló — LA PIEZA NO SE PUBLICÓ (la CI despliega desde GitHub).\n'
+                 f'  {ultima}\n'
+                 '  El commit quedó local. Arreglos: guarda credenciales para el repo de\n'
+                 '  modelos (PAT fine-grained de sólo ese repo), o corre con --ya para\n'
+                 '  publicar directo con wrangler mientras tanto.')
 
-    # 5. deploy — el acto de publicar
-    if a.sin_deploy:
-        print('✔ commiteado. Sin deploy (--sin-deploy): nada visible aún.')
-        return
-    # En Windows npx es npx.cmd: which lo resuelve; a pelo, subprocess no lo halla.
-    npx = shutil.which('npx') or 'npx'
-    c, salida = correr([npx, 'wrangler', 'deploy'], repo)
-    if c != 0:
-        sys.exit(f'wrangler deploy falló:\n{salida[-600:]}')
+    # 5. --ya: en línea en segundos, sin esperar la CI (y plan B sin push)
+    if a.ya:
+        # En Windows npx es npx.cmd: which lo resuelve; a pelo, subprocess no lo halla.
+        npx = shutil.which('npx') or 'npx'
+        c, salida = correr([npx, 'wrangler', 'deploy'], repo)
+        if c != 0:
+            sys.exit(f'wrangler deploy falló:\n{salida[-600:]}')
 
     print(f'✔ publicado: https://jarvis-modelos.disenocorptpc.workers.dev/modelos/{archivo}  ({datos/MB:.1f} MB)')
-    print(f'  deep link: https://asistente-manuales-jarvis.disenocorptpc.workers.dev/?pieza={a.id}')
+    print(f'  deep link:  https://asistente-manuales-jarvis.disenocorptpc.workers.dev/?pieza={a.id}')
+    if a.ya:
+        print('  en línea YA (wrangler)' + ('' if push_ok else ' · ⚠ el push falló: GitHub quedó atrás, pushea al rato'))
+    else:
+        print('  la CI de Cloudflare lo despliega en ~40 s')
 
 
 if __name__ == '__main__':
