@@ -51,7 +51,7 @@ from mathutils import Vector
 bl_info = {
     "name": "JARVIS — GLB con contrato (Palace)",
     "author": "Coordinación de Diseño Industrial y 3D — The Palace Company",
-    "version": (1, 1, 2),
+    "version": (1, 1, 3),
     "blender": (4, 2, 0),
     "location": "Propiedades > Objeto / Escena · File > Export > GLB JARVIS",
     "description": "Metadata de producción + linter que bloquea + export GLB "
@@ -183,8 +183,24 @@ TIPOS_GEOMETRIA = {"MESH", "CURVE", "SURFACE", "FONT", "META"}
 
 
 def piezas_de(context):
+    """Sólo lo que el exportador puede de verdad exportar: objetos EN el View
+    Layer y seleccionables. Un objeto en una colección excluida sigue vivo en
+    scene.objects pero select_set() revienta con "cannot be selected because
+    it is not in View Layer" (pasó en campo con un Plane olvidado). Esos se
+    omiten aquí y el linter los reporta como aviso."""
+    en_capa = {o.name for o in context.view_layer.objects}
     return [o for o in context.scene.objects
-            if o.type in TIPOS_GEOMETRIA and o.jarvis_meta.incluir]
+            if o.type in TIPOS_GEOMETRIA and o.jarvis_meta.incluir
+            and o.name in en_capa and not o.hide_select]
+
+
+def fantasmas_de(context):
+    """Los que serían pieza pero el exportador no puede tocar: fuera del View
+    Layer (colección excluida) o con candado de selección."""
+    en_capa = {o.name for o in context.view_layer.objects}
+    return [o.name for o in context.scene.objects
+            if o.type in TIPOS_GEOMETRIA and o.jarvis_meta.incluir
+            and (o.name not in en_capa or o.hide_select)]
 
 
 def materiales_en_uso(objetos):
@@ -245,6 +261,11 @@ def lint(context, con_geometria=True):
     # Piezas
     if not piezas:
         errores.append("No hay ninguna pieza marcada para exportar")
+    fantasmas = fantasmas_de(context)
+    if fantasmas:
+        avisos.append("NO se exportarán (colección excluida del View Layer o candado "
+                      f"de selección): {', '.join(fantasmas[:5])}"
+                      + ("…" if len(fantasmas) > 5 else ""))
     ids = {}
     for o in piezas:
         m = o.jarvis_meta

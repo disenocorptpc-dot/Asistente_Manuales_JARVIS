@@ -173,6 +173,28 @@ m.capa = "Iluminación"
 bpy.ops.scene.jarvis_prellenar()
 check("no pisa lo capturado", m.capa == "Iluminación")
 
+print("\n== 6. objetos en colección excluida no truenan el export ==")
+col = bpy.data.collections.new("Oculta")
+sc.collection.children.link(col)
+bpy.ops.mesh.primitive_cube_add(size=0.1, location=(5, 0, 0))
+fantasma = bpy.context.active_object
+fantasma.name = "fantasma_excluido"
+for c in list(fantasma.users_collection):
+    c.objects.unlink(fantasma)
+col.objects.link(fantasma)
+bpy.context.view_layer.layer_collection.children["Oculta"].exclude = True
+
+r = mod.lint(bpy.context, con_geometria=False)
+check("el linter avisa del fantasma", any("fantasma_excluido" in a for a in r["avisos"]),
+      f"avisos: {r['avisos']}")
+salida3 = Path(tempfile.gettempdir()) / "TEST-ADDON-01-R1-fantasma.glb"
+salida3.unlink(missing_ok=True)
+r = bpy.ops.export_scene.jarvis_glb(filepath=str(salida3), comprimir=False)
+g3 = leer_glb(salida3)
+nombres3 = {n.get("name") for n in g3.get("nodes", [])}
+check("export NO truena con el fantasma", r == {"FINISHED"})
+check("el fantasma no viaja", "fantasma_excluido" not in nombres3)
+
 print(f"\nGLB de prueba: {salida}  ({salida.stat().st_size} bytes)")
 if FALLAS:
     print(f"\n{len(FALLAS)} FALLAS: {FALLAS}")
