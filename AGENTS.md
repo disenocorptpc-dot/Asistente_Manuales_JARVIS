@@ -129,11 +129,15 @@ python -m http.server 8317 --directory public
 - **Ronda de campo #1** (feedback del teléfono, mismo día): la escena de XR8
   nace VACÍA y el GLB se veía NEGRO — las luces viven en cada shell y el AR no
   tenía; ahora espeja las de desktop. Escalas 1:2 y 1:10 además del 1:1 (ver
-  piezas grandes de cerca). Grupo `orientado` en el grafo + botón «De pie»:
-  un marcador en pared muestra la pieza acostada porque el modelo se asienta
-  sobre el plano de la imagen (el tope de la imagen es -Z local; si en campo
-  la pieza cuelga hacia abajo, el signo va al revés en scene.js). Slider de
-  explotado con pulgar de 32 px.
+  piezas grandes de cerca). Grupo `orientado` en el grafo con botón de
+  orientación. Slider de explotado con pulgar de 32 px.
+- **Ronda de campo #2** (mismo día): el signo del giro iba al revés — la pieza
+  quedaba mirando hacia abajo. **Empírico: el tope de la imagen es +Z en el
+  target de 8th Wall, no -Z como en ARKit.** Queda `pared: +Math.PI/2` en
+  scene.js. Los modos se renombraron a lo que de verdad compensan — dónde está
+  el marcador: «Mesa» (sin giro) / «Pared» (+90°); "Plano/De pie" era ambiguo
+  y el usuario los leyó al revés. Pendiente de campo: si en pared la pieza
+  queda de pie pero DA LA ESPALDA, falta `rotation.y = Math.PI` en 'pared'.
 - F2 — addon de Blender (metadata + linter). F3 — HUD hi-tech completo.
   F4 — captura + deep links. F5–F7 — ver HANDOFF §12.
 

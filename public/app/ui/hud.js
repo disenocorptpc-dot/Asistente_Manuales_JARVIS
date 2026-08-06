@@ -78,16 +78,16 @@ export function crearHUD(visor) {
   });
   pintarEscala();
 
-  // ── Orientación: un marcador en pared muestra la pieza acostada (el modelo
-  //    se asienta sobre el plano de la imagen). El botón la para. Pedido de
-  //    campo 2026-08-06.
-  const ORIENTA = { plano: '▭ Plano', de_pie: '▯ De pie' };
+  // ── Orientación: el botón dice DÓNDE ESTÁ EL MARCADOR, que es lo que se
+  //    compensa. En mesa la pieza se para sola; en pared, sin compensar, se
+  //    ve acostada. Nombres y signo corregidos en campo (2026-08-06 ronda #2).
+  const ORIENTA = { mesa: '▤ Mesa', pared: '▯ Pared' };
   function pintarOrienta() {
     el.orienta.textContent = ORIENTA[visor.grafo.orientacion];
-    el.orienta.classList.toggle('activa', visor.grafo.orientacion === 'de_pie');
+    el.orienta.classList.toggle('activa', visor.grafo.orientacion === 'pared');
   }
   el.orienta.addEventListener('click', () => {
-    visor.grafo.orientar(visor.grafo.orientacion === 'plano' ? 'de_pie' : 'plano');
+    visor.grafo.orientar(visor.grafo.orientacion === 'mesa' ? 'pared' : 'mesa');
     pintarOrienta();
   });
   pintarOrienta();

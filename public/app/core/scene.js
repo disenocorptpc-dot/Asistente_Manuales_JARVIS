@@ -10,13 +10,16 @@
 */
 import * as THREE from 'three';
 
-/* Un marcador en PARED tiene la normal horizontal: el modelo Y-up se asienta
-   sobre el plano de la imagen y se ve acostado. 'de_pie' gira -90° sobre X
-   para pararlo contra la pared: en el espacio del target el tope de la imagen
-   es -Z, y rotar -90° manda el +Y del modelo justo ahí. El signo es
-   verificable en campo con el propio botón: si la pieza cuelga hacia abajo,
-   el tope era +Z y esto cambia de signo. */
-const ORIENTACIONES = { plano: 0, de_pie: -Math.PI / 2 };
+/* Los modos nombran DÓNDE ESTÁ EL MARCADOR, que es lo que se compensa:
+   - mesa: marcador horizontal; el modelo Y-up se para solo sobre él. Sin giro.
+   - pared: marcador vertical; sin compensar, la pieza se ve acostada
+     (se asienta sobre el plano de la imagen). Se gira +90° sobre X.
+   El signo del giro es EMPÍRICO, corregido en campo (2026-08-06, ronda #2):
+   con -90° la pieza quedaba mirando hacia abajo → el tope de la imagen es +Z
+   en el espacio del target de 8th Wall, no -Z como asume la convención de
+   ARKit. Si en pared la pieza queda de pie pero dando la ESPALDA, falta un
+   rotation.y = Math.PI en la entrada 'pared' — siguiente cosa a verificar. */
+const ORIENTACIONES = { mesa: 0, pared: Math.PI / 2 };
 
 export function crearGrafo(configOrientacion = {}) {
   const ancla = new THREE.Group();
@@ -29,7 +32,7 @@ export function crearGrafo(configOrientacion = {}) {
   orientado.add(escalado);
   ancla.visible = false;
 
-  let orientacion = 'plano';
+  let orientacion = 'mesa';
   const actualizables = [];
 
   const grafo = {
@@ -56,6 +59,6 @@ export function crearGrafo(configOrientacion = {}) {
     update(dt) { for (const fn of actualizables) fn(dt); },
   };
 
-  grafo.orientar(configOrientacion?.default ?? 'plano');
+  grafo.orientar(configOrientacion?.default ?? 'mesa');
   return grafo;
 }

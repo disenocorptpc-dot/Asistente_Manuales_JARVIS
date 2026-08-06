@@ -25,8 +25,8 @@
   },
 
   "orientacion": {
-    "default": "plano",
-    "_porque": "Un marcador en PARED tiene la normal horizontal: el modelo Y-up se asienta sobre el plano de la imagen y se ve acostado. 'de_pie' gira -90° sobre X (el tope de la imagen es -Z local) para que la pieza quede vertical sobre la pared. Default plano porque en mesa/piso y en hitTest es lo correcto; el botón del HUD alterna."
+    "default": "mesa",
+    "_porque": "Los modos nombran DÓNDE ESTÁ EL MARCADOR: 'mesa' (horizontal, sin giro — la pieza se para sola) y 'pared' (vertical, +90° sobre X para levantarla). Signo corregido en campo 2026-08-06: con -90° la pieza miraba hacia abajo — el tope de la imagen es +Z en 8th Wall, no -Z como en ARKit. Default mesa porque también es lo correcto en hitTest; el botón del HUD alterna."
   },
 
   "explotado": {
