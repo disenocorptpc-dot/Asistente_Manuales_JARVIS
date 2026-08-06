@@ -38,6 +38,18 @@
 
 <canvas id="lienzo"></canvas>
 
+<!-- Portal de arranque: el AR empieza con un TAP. No es cosmético — en iOS
+     el permiso de giroscopio SÓLO se puede pedir desde un gesto del usuario,
+     y sin gyro el SLAM no trackea. También es donde se avisa del webview. -->
+<div id="portal">
+  <div id="portal-caja">
+    <h1 id="portal-titulo">Visor 3D AR</h1>
+    <p id="portal-texto">Apunta, ancla y revisa la pieza a escala real.</p>
+    <button id="portal-primario">Iniciar AR</button>
+    <button id="portal-secundario">Continuar sin AR</button>
+  </div>
+</div>
+
 <div id="hud">
   <div id="hud-arriba">
     <span id="hud-titulo">JARVIS · Visor 3D</span>

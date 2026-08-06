@@ -9,6 +9,20 @@ export async function iniciarAR({ visor, hud, debug, registro, contenido, motorL
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('el navegador no soporta cámara');
   if (!isSecureContext) throw new Error('se necesita HTTPS');
 
+  /* iOS 13+: el giroscopio requiere permiso explícito y SÓLO se puede pedir
+     desde un gesto del usuario — por eso iniciarAR se llama desde el tap del
+     portal, y esta petición va PRIMERO, antes de perder la activación.
+     Sin gyro el SLAM pierde la fusión visión+sensores y no sostiene la pose. */
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined'
+        && typeof DeviceMotionEvent.requestPermission === 'function') {
+      const r = await DeviceMotionEvent.requestPermission();
+      if (r !== 'granted') console.warn('[ar] giroscopio negado: tracking degradado');
+    }
+  } catch (e) {
+    console.warn('[ar] permiso de sensores no disponible:', e);
+  }
+
   /* La cámara se pide ANTES de XR8: XR8 rechaza con undefined cuando
      getUserMedia falla y el diagnóstico queda ciego. */
   try {

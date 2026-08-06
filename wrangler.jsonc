@@ -2,7 +2,9 @@
   // Worker de puros assets estáticos: no hay código de servidor todavía.
   // Cuando llegue F6 (proxy de SharePoint) se agrega "main" con la ruta
   // /api/model/:id — misma unidad de deploy, por eso Worker y no Pages.
-  "name": "jarvis-visor-ar",
+  // Mismo nombre que el Worker ya desplegado en la cuenta (asistente-manuales-jarvis
+  // .disenocorptpc.workers.dev) — si difiere, un deploy crearía OTRO worker.
+  "name": "asistente-manuales-jarvis",
   "compatibility_date": "2026-08-05",
 
   "assets": {
