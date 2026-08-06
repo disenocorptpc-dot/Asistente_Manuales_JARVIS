@@ -138,6 +138,19 @@ python -m http.server 8317 --directory public
   el marcador: «Mesa» (sin giro) / «Pared» (+90°); "Plano/De pie" era ambiguo
   y el usuario los leyó al revés. Pendiente de campo: si en pared la pieza
   queda de pie pero DA LA ESPALDA, falta `rotation.y = Math.PI` en 'pared'.
+- **F5 adelantada en parcial** (pedido del usuario, 2026-08-06): voz
+  push-to-talk por **Web Speech API** (`ui/voz.js`), es-MX, vocabulario
+  cerrado: explota/arma (tween animado en `coordinar.js`), órbita/alto
+  (`core/orbita.js`, turntable sobre el Y de `escalado` — así se ve igual en
+  mesa y pared), escalas, mesa/pared, y **nombres de capa del GLB cargado**
+  (vocabulario dinámico de los extras, cero hardcodeo). El matcher
+  `emparejar()` es puro y exportado: se prueba sin micrófono. Sin la API el
+  botón 🎤 desaparece solo. Chrome/Android sólido; iOS Safari frágil —
+  Whisper por Worker queda como fallback cuando F6 traiga el Worker con
+  código. La voz no pinta UI: pasa por la fachada del HUD
+  (escalaA/orientaA/alternarCapa) para que los botones queden consistentes.
+  Con `?debug=1`, `window.jarvis = {visor, hud}` es el asidero de consola
+  para diagnosticar en dispositivo.
 - F2 — addon de Blender (metadata + linter). F3 — HUD hi-tech completo.
   F4 — captura + deep links. F5–F7 — ver HANDOFF §12.
 

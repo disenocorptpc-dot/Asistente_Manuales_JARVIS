@@ -113,8 +113,14 @@ protocolo de enganche impreso al lado.
   protocolo de enganche en la UI y distinción entre 1:1 medido y `≈ 1:1`
   estimado. **⏳ Falta el teléfono:** imprimir la hoja al 100% y medir el 1:1
   contra un objeto de dimensión conocida. El escritorio no valida tracking.
+- **F5 parcial adelantada** — voz push-to-talk (Web Speech API, es-MX,
+  vocabulario cerrado): mantén el 🎤 presionado y di *explota · arma · órbita ·
+  alto · uno a uno · mitad · décimo · mesa · pared* o el nombre de una capa del
+  GLB. Sin la API el botón desaparece solo; Whisper por Worker queda como
+  fallback para F6.
 - F2 — addon de Blender (metadata + linter) · F3 — HUD hi-tech completo ·
-  F4 — captura/deep links · F5 — voz · F6 — SharePoint · F7 — gestos.
+  F4 — captura/deep links · F5 — voz (falta Whisper) · F6 — SharePoint ·
+  F7 — gestos.
 
 ## Deploy
 

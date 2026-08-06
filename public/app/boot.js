@@ -13,6 +13,7 @@ import { crearVisor } from './core/coordinar.js';
 import { iniciarAR } from './ar-shell.js';
 import { iniciarDesktop } from './desktop-shell.js';
 import { crearHUD } from './ui/hud.js';
+import { crearVoz } from './ui/voz.js';
 import { crearDebug } from './debug.js';
 
 const params = new URLSearchParams(location.search);
@@ -79,6 +80,11 @@ async function arrancar() {
   const visor = crearVisor(contenido);
   const hud = crearHUD(visor);
   const debug = crearDebug(visor);
+  crearVoz({ visor, hud }); // sin Web Speech API el botón desaparece solo
+
+  /* Con ?debug=1, un asidero en consola para diagnosticar en dispositivo:
+     jarvis.visor.explotar(1, 1), jarvis.visor.orbita.iniciar(), etc. */
+  if (params.has('debug')) window.jarvis = { visor, hud };
 
   if (registro) {
     try { await visor.cargar(registro.modelo); }

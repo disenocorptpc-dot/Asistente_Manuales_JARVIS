@@ -34,6 +34,11 @@
     "_porque": "Desplazamiento máximo del explotado procedural cuando la pieza no trae explode_dist_cm propio. Se afina en campo con el slider."
   },
 
+  "orbita": {
+    "vuelta_segundos": 12,
+    "_porque": "Turntable de presentación (comando de voz 'órbita'). Una vuelta en 12 s: lo bastante lento para leer la pieza sin marear, sobre todo en AR donde el fondo es el mundo real."
+  },
+
   "tracking": {
     "coaching_angulo_grados": 40,
     "_porque": "Playbook §6: supervivencia de features 18% a 7° de inclinación. Pasando 40° entre normal del marcador y línea de vista se avisa al usuario."

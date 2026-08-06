@@ -93,9 +93,12 @@ export function crearHUD(visor) {
   pintarOrienta();
 
   // ── Explotado: slider físico y grande, tercio inferior, para el pulgar.
+  //    Todo pasa por visor.explotar: un arrastre manual cancela el tween de
+  //    la voz, y cuando la voz anima, el slider se mueve solo (onExplotar).
   el.slider.addEventListener('input', () => {
-    visor.explotado?.aplicar(el.slider.valueAsNumber / 100);
+    visor.explotar(el.slider.valueAsNumber / 100);
   });
+  visor.onExplotar((v) => { el.slider.valueAsNumber = Math.round(v * 100); });
 
   // ── Capas
   function reconstruirCapas() {
@@ -136,6 +139,18 @@ export function crearHUD(visor) {
   return {
     mostrarFicha,
     estado,
+
+    /* Fachada para la voz (ui/voz.js): la voz no pinta nada por su cuenta —
+       pasa por aquí para que botones e indicadores queden consistentes. */
+    escalaA(modo) { const m = visor.escala.cambiarModo(modo); pintarEscala(); return m; },
+    orientaA(modo) { const m = visor.grafo.orientar(modo); pintarOrienta(); return m; },
+    alternarCapa(nombre) {
+      const b = [...el.capas.children]
+        .find((x) => x.textContent.toLowerCase() === nombre.toLowerCase());
+      if (!b) return false;
+      b.click(); // el botón ya sabe alternar la capa y pintarse
+      return true;
+    },
 
     /* El protocolo de enganche va en la UI, no sólo en el impreso (HANDOFF §3):
        sin esto el usuario intenta encuadrar marcador y pieza a la vez, falla, y

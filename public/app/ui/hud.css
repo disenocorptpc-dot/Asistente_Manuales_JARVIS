@@ -124,6 +124,16 @@ body {
   padding: 8px 14px; border-radius: 999px;
 }
 #hud-orienta.activa { color: #0a1016; background: var(--bronce); }
+/* Push-to-talk: se mantiene presionado. touch-action none — el gesto es del
+   botón, no del scroll. El estado grabando cambia color, no filtros. */
+#hud-voz {
+  font-size: 15px; cursor: pointer; touch-action: none;
+  -webkit-touch-callout: none;
+  color: var(--perla); background: var(--panel);
+  border: 1px solid var(--bronce);
+  min-width: 44px; height: 35px; border-radius: 999px;
+}
+#hud-voz.grabando { background: #FFD9A8; border-color: #FFD9A8; }
 .capa {
   font-size: 12.5px; letter-spacing: .04em;
   color: var(--ligero); background: var(--panel);
