@@ -37,6 +37,7 @@ desktop.ini
 herramientas/node_modules/
 herramientas/_*
 herramientas/package-lock.json
+__pycache__/
 
 # Cache local del CLI de wrangler
 .wrangler/
