@@ -51,7 +51,7 @@ from mathutils import Vector
 bl_info = {
     "name": "JARVIS — GLB con contrato (Palace)",
     "author": "Coordinación de Diseño Industrial y 3D — The Palace Company",
-    "version": (1, 0, 0),
+    "version": (1, 1, 0),
     "blender": (4, 2, 0),
     "location": "Propiedades > Objeto / Escena · File > Export > GLB JARVIS",
     "description": "Metadata de producción + linter que bloquea + export GLB "
@@ -375,7 +375,9 @@ class JV_PT_escena(Panel):
         fila.prop(em, "revision")
         fila.prop(em, "autor")
         col.separator()
-        col.operator(JV_OT_revisar.bl_idname, icon="CHECKMARK")
+        fila = col.row(align=True)
+        fila.operator(JV_OT_prellenar.bl_idname, icon="OUTLINER_OB_GROUP_INSTANCE")
+        fila.operator(JV_OT_revisar.bl_idname, icon="CHECKMARK")
 
         # El último veredicto del linter, si existe (lo guarda Revisar/Export).
         wm = context.window_manager
@@ -392,6 +394,61 @@ class JV_PT_escena(Panel):
                 caja.label(text=a, icon="INFO")
             if not r["errores"]:
                 caja.label(text="Listo para exportar", icon="CHECKMARK")
+
+
+class JV_OT_prellenar(Operator):
+    """Prellena pieza_id, nombre y capa desde los nombres de objeto y sus
+colecciones. Sólo llena lo VACÍO — lo capturado a mano no se toca. Capturar
+20 piezas a mano es un castigo; esto deja el linter en verde en un clic y
+tú corriges lo que haya adivinado mal"""
+
+    bl_idname = "scene.jarvis_prellenar"
+    bl_label = "Prellenar desde nombres"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        # La selección manda; sin selección, todas las piezas incluidas.
+        base = [o for o in context.selected_objects
+                if o.type in TIPOS_GEOMETRIA and o.jarvis_meta.incluir]
+        objetivos = base or piezas_de(context)
+        if not objetivos:
+            self.report({"WARNING"}, "No hay piezas que prellenar")
+            return {"CANCELLED"}
+
+        import unicodedata
+
+        def a_id(texto):
+            plano = unicodedata.normalize("NFD", texto)
+            plano = "".join(c for c in plano if unicodedata.category(c) != "Mn")
+            plano = re.sub(r"[^A-Za-z0-9._-]+", "-", plano).strip("-.")
+            return plano or "PIEZA"
+
+        llenados = 0
+        for i, o in enumerate(sorted(objetivos, key=lambda x: x.name), 1):
+            m = o.jarvis_meta
+            toco = False
+            if not m.pieza_id.strip():
+                m.pieza_id = a_id(f"{i:02d}-{o.name}")
+                toco = True
+            if not m.pieza_nombre.strip():
+                m.pieza_nombre = o.name.replace("_", " ").replace(".", " ").strip()
+                toco = True
+            if not m.capa.strip():
+                # La colección ES la capa (HANDOFF §6). Las genéricas de
+                # Blender no dicen nada: caen a "General".
+                col = o.users_collection[0].name if o.users_collection else ""
+                m.capa = col if col not in ("", "Scene Collection", "Collection") else "General"
+                toco = True
+            if toco:
+                llenados += 1
+
+        # El resultado se revisa de inmediato: el punto es dejar el linter verde.
+        r = lint(context, con_geometria=False)
+        context.window_manager["jarvis_lint"] = json.dumps(r, ensure_ascii=False)
+        faltan = len(r["errores"])
+        self.report({"INFO"}, f"{llenados} piezas prellenadas" +
+                    (f" · quedan {faltan} errores (ver panel)" if faltan else " · linter en verde"))
+        return {"FINISHED"}
 
 
 class JV_OT_revisar(Operator):
@@ -683,6 +740,7 @@ CLASSES = (
     JV_EscenaMeta,
     JV_PT_objeto,
     JV_PT_escena,
+    JV_OT_prellenar,
     JV_OT_revisar,
     JV_OT_export,
     JV_Preferencias,

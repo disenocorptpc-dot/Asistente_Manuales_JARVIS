@@ -156,6 +156,23 @@ g2 = leer_glb(salida2)
 exts2 = set(g2.get("extensionsRequired", []) + g2.get("extensionsUsed", []))
 check("sin Draco cuando se apaga", "KHR_draco_mesh_compression" not in exts2)
 
+print("\n== 5. prellenar desde nombres ==")
+bpy.ops.mesh.primitive_cube_add(size=0.2, location=(3, 0, 0))
+nuevo = bpy.context.active_object
+nuevo.name = "Perfil_Aluminio.001"
+bpy.ops.object.select_all(action="DESELECT")
+nuevo.select_set(True)
+r = bpy.ops.scene.jarvis_prellenar()
+m = nuevo.jarvis_meta
+check("prellenar FINISHED", r == {"FINISHED"})
+check("id generado válido", bool(mod.ID_RE.match(m.pieza_id)), f'= "{m.pieza_id}"')
+check("nombre legible", m.pieza_nombre == "Perfil Aluminio 001", f'= "{m.pieza_nombre}"')
+check("capa con fallback General", m.capa == "General", f'= "{m.capa}"')
+# lo capturado a mano NO se pisa
+m.capa = "Iluminación"
+bpy.ops.scene.jarvis_prellenar()
+check("no pisa lo capturado", m.capa == "Iluminación")
+
 print(f"\nGLB de prueba: {salida}  ({salida.stat().st_size} bytes)")
 if FALLAS:
     print(f"\n{len(FALLAS)} FALLAS: {FALLAS}")
