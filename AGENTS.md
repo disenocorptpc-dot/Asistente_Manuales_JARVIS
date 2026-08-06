@@ -3,6 +3,41 @@
 Si estás leyendo esto desde cero: este archivo te ahorra re-descubrir lo que ya
 se pagó. Léelo completo antes de tocar código.
 
+## TL;DR para una IA que aterriza sin memoria
+
+- Esto es un **visor 3D AR** (8th Wall + Three.js, sin build step) que ancla un
+  GLB al mundo real a escala 1:1 usando un marcador impreso. Vive en
+  `https://asistente-manuales-jarvis.disenocorptpc.workers.dev`.
+- **Hay DOS repos.** Éste es el de CÓDIGO. El de CONTENIDO (los GLB publicados)
+  es [JARVIS-Modelos](https://github.com/disenocorptpc-dot/JARVIS-Modelos),
+  clonado como carpeta **hermana** en la misma máquina si vas a usar el modo
+  local de publicación. Ver [§ Dos repos](#dos-repos-código-y-contenido-f6-decidido-2026-08-06).
+- **Un `git push` a `main` de CUALQUIERA de los dos repos despliega solo a
+  producción.** No hay staging, no hay `.github/workflows` (la CI es Cloudflare
+  Workers Builds). Ver [§ push=deploy](#️-un-push-a-main-es-un-deploy-a-producción).
+  Antes de pushear, piensa si lo que vas a subir debe estar público YA.
+- El repo tiene **tres secrets/tokens distintos, no los confundas**:
+  1. Un PAT clásico de GitHub (`ghp_…`) que el usuario ha ido pegando en el
+     chat para pushes puntuales — **rótalo si lo ves en un transcript**, no es
+     de uso diario.
+  2. Un fine-grained PAT de GitHub guardado en el credential manager de
+     Windows, enjaulado a sólo escribir en `JARVIS-Modelos` (modo local).
+  3. Dos **secrets del Worker** (`wrangler secret list` desde este repo):
+     `PUBLICAR_TOKEN` (el que pegan los compañeros en las preferencias del
+     addon de Blender) y `GITHUB_PAT_MODELOS` (fine-grained, sólo Contents de
+     JARVIS-Modelos, usado por `src/worker.js` para hacer commits vía API).
+     Ninguno de estos dos sale nunca del Worker ni del addon.
+- **Antes de tocar el addon de Blender**, sabe que existe en DOS copias que
+  deben ser idénticas: `herramientas/blender-addon/jarvis_glb.py` (canónica) y
+  `public/addon/jarvis_glb.py` (la que el equipo descarga desde el visor). Edita
+  la canónica, copia a `public/addon/` y a
+  `%APPDATA%\Blender Foundation\Blender\<version>\scripts\addons\` si vas a
+  probar en vivo. `herramientas/blender-addon/probar_addon.py` truena si las
+  copias difieren — córrelo después de cualquier edición.
+- **Antes de tocar `contenido.json`, `scale.js`, el marcador o el linter del
+  addon**, lee VERIFICACIONES.md completo — son correcciones pagadas leyendo
+  el binario minificado del motor, no intuidas.
+
 ## Orden de lectura obligatorio
 
 1. **[PLAYBOOK-WebAR.md](PLAYBOOK-WebAR.md)** — destilado empírico del proyecto
@@ -61,6 +96,110 @@ Tres restricciones independientes convergen ahí (VERIFICACIONES §9):
 El A5 de 14.8 cm del HANDOFF §6 **falla 1 y 2**. `generar-marcador.py` aborta
 con las tres guardas explicadas, así que no hay forma de generar un marcador
 que compile mal — pero si cambias medidas, entiende por qué antes de tocarlas.
+
+## Mapa de archivos
+
+```
+public/                      ← lo ÚNICO que sirve el Worker (assets estáticos)
+  index.html                 ← entry único, importmap (three@0.160.0 clavado), sin build step
+  contenido.json             ← TODO parámetro medido/decidido, con su _porque
+  guia-equipo.pdf            ← manual de una hoja para el equipo (generado con reportlab+segno,
+                                ver scratchpad histórico; regenerar si cambia algo de UI/voz)
+  favicon.png · apple-touch-icon.png
+  addon/jarvis_glb.py        ← COPIA descargable del addon (debe ser idéntica a la canónica)
+  image-targets/             ← target compilado (JARVIS-M23.json + luminancia 480×640)
+  models/                    ← sólo el GLB sintético de F0; los publicados viven en JARVIS-Modelos
+  app/
+    boot.js                  ← arranque: precarga XR8, portal, elección de shell, resolverPieza()
+    ar-shell.js              ← ÚNICO junto con anchor-* que importa XR8: permisos, pipeline, luces
+    anchor-marker.js         ← modo A: marcador(es) → pose + escala 1:1 (nunca identidad)
+    anchor-hittest.js        ← modo B: superficie sin marcador (tabletop, escala estimada)
+    desktop-shell.js         ← fallback orbital sin cámara; también donde se desarrolla el core
+    debug.js                 ← ?debug=1, expone window.jarvis = {visor, hud}
+    core/                    ← CERO imports de XR8, CERO DOM (regla dura, ver abajo)
+      coordinar.js           ← ensambla el visor; tween de explotado (explotar/onExplotar)
+      scene.js               ← grafo ancla→orientado→escalado→modelo; orientar('mesa'|'pared')
+      loader.js               ← GLB→piezas; GLTFLoader+DRACOLoader; modo inspección si falta contrato
+      scale.js               ← fórmula de escala 1:1 (normalizada, ver corrección abajo)
+      explode.js             ← despiece procedural + override por pieza
+      layers.js              ← toggles por capa (extras.capa)
+      pick.js                ← raycast → ficha de producción
+      orbita.js              ← turntable sobre el Y de `escalado`
+    ui/
+      hud.js  hud.css        ← HUD, catálogo (📚), fachada escalaA/orientaA/alternarCapa
+      voz.js                 ← comandos de voz, ver tabla abajo. emparejar() es pura y testeable
+      sonido.js               ← efectos sintetizados con Web Audio, ver tabla abajo
+src/
+  worker.js                  ← ÚNICA ruta de código del Worker: PUT /api/publicar (ver F6 abajo)
+herramientas/                ← FUERA de public/, no se sirve
+  generar-marcador.py        ← arte del marcador, generativo y determinista por semilla
+  evaluar-marcador.py        ← valida un PNG de marcador contra los 4 criterios de campo
+  generar-glb-sintetico.py   ← GLB de prueba multi-pieza (Blender headless)
+  publicar-modelo.py         ← publicación modo LOCAL (clones + git); ver F6
+  .publicar.token            ← (gitignored) el token del equipo, en texto plano, un renglón
+  marcadores/                ← arte generado del marcador vigente (300dpi/32ppcm/hoja A4)
+  blender-addon/
+    jarvis_glb.py            ← el addon CANÓNICO — edita aquí, luego propaga
+    probar_addon.py          ← suite headless: linter, contrato en el GLB, sync de copias
+wrangler.jsonc                ← config del Worker del visor (comentarios explican R2 estacionado)
+.gitattributes                 ← *.pdf/*.glb/*.png/*.webp/*.ico como binarios SIEMPRE
+```
+
+## Comandos de voz (`public/app/ui/voz.js`, función `emparejar`)
+
+Vocabulario cerrado, es-MX, sin acentos, por contención de frase — no
+transcribe dictado. Push-to-talk: mantener presionado el 🎤, hablar, soltar.
+
+| dices | acción |
+|---|---|
+| «uno a uno» / «tamaño real» / «escala real» | escala 1:1 |
+| «mitad» / «media» / «cincuenta» | escala 1:2 |
+| «décimo» / «décima» / «miniatura» / «diez» | escala 1:10 |
+| «explota» / «explotado» / «explosión» / «despiece» / «desarma» | abre el despiece (tween 1.2 s) |
+| «arma» / «cierra» / «junta» | cierra el despiece |
+| «origen» / «reinicia» / «restaura» / «inicio» | órbita detenida y de frente + despiece cerrado + escala inicial |
+| «órbita» / «gira» / «rota» | inicia el turntable |
+| «alto» / «quieto» / «para» / «detente» / «stop» | detiene el turntable |
+| «mesa» | orientación: marcador horizontal, sin giro |
+| «pared» | orientación: marcador vertical, +90° sobre X |
+| nombre exacto de una capa del GLB cargado | alterna esa capa (vocabulario dinámico, no hardcodeado) |
+
+Orden de evaluación en el código: escalas → explotar → **origen (antes de
+órbita, para no chocar con «reinicia»)** → órbita → orientación → capas (al
+final, para no tapar los comandos fijos).
+
+## Sonido del HUD (`public/app/ui/sonido.js`)
+
+Sintetizado con Web Audio — CERO archivos de audio. `crearSonido(config)`
+devuelve: `activo` (getter) · `alternar()` (toggle, persiste en localStorage
+`jarvis_sonido`) · `tick()` (toggles genéricos) · `blip()` (ficha de pieza) ·
+`escucha()` (mic abierto) · `exito()` / `error()` · `lock()` (enganche de
+marcador — el dramático) · `perdida()` (**vacío a propósito**, ver Ronda #3) ·
+`carga()` (GLB listo) · `explota()` / `arma()` · `orbita(encendida)`.
+AudioContext se crea/reanuda en el primer `pointerdown` (autoplay).
+
+## Secrets y tokens — mapa completo (no confundir)
+
+| quién | dónde vive | para qué | cómo verificar |
+|---|---|---|---|
+| PAT clásico `ghp_…` | ninguna parte fija — se pega ad-hoc | pushes puntuales del asistente al repo de código | si aparece en un chat, **rotarlo** |
+| PAT fine-grained (modo local) | Windows Credential Manager, `useHttpPath` amarrado a `JARVIS-Modelos.git` | `git push` desde el clon local de JARVIS-Modelos | `git -C ../JARVIS-Modelos push --dry-run` (no debe pedir credenciales) |
+| `PUBLICAR_TOKEN` | secret del Worker de este repo + `herramientas/.publicar.token` (gitignored) | lo pega el equipo en las preferencias del addon (modo remoto) | `npx wrangler secret list` |
+| `GITHUB_PAT_MODELOS` | secret del Worker de este repo únicamente | `src/worker.js` lo usa para firmar commits vía Git Data API | `npx wrangler secret list`; nunca debería salir de ahí |
+
+Si `PUT /api/publicar` responde 503: los secrets se cayeron (se ha visto que
+un deploy de la CI los tira). `wrangler secret list` para confirmar y reponer
+— `PUBLICAR_TOKEN` desde `.publicar.token`, `GITHUB_PAT_MODELOS` regenerando
+en GitHub si ya no está guardado en ningún lado.
+
+## Preferencias del addon de Blender (`JV_Preferencias`)
+
+- `publicar_via`: `remoto` (default — HTTP al Worker, sin git) / `local`
+  (avanzado — corre `publicar-modelo.py`, necesita los dos repos clonados).
+- `token_publicacion`: el token del equipo (modo remoto).
+- `url_visor`: default la URL de producción; cámbiala sólo para pruebas.
+- `repo_codigo`: carpeta LOCAL del clon de este repo (NO url) — sólo modo
+  local; la UI valida en vivo que el script y el repo hermano existan.
 
 ## Reglas duras de arquitectura
 
@@ -172,6 +311,20 @@ python -m http.server 8317 --directory public
   `bl_system_properties_get()` y se restaura del respaldo; (2) leer un
   PropertyGroup cuyo respaldo se borró es puntero colgante y Blender
   REVIENTA (ACCESS_VIOLATION) — todo se lee a escalares ANTES de ocultar.
+- **Catálogo en la app** (`ui/hud.js`, pedido de campo tras F6): botón 📚 en
+  el HUD que lista `piezas.json` del repo de modelos (más reciente primero) y
+  carga al tocar — resuelve que el deep link por pieza no era buena UX
+  primaria. Sigue la regla aditiva: sin `contenido.catalogo` el botón
+  desaparece; si no responde, avisa y la carga manual con ⬆ sigue viva.
+- **Ronda de campo #4** (2026-08-06, primer uso real del addon por un
+  compañero): publicar la MISMA revisión dos veces daba un 409 en jerga de
+  CLI ("--rev R2?", "sobrescribir=1") que no significaba nada en Blender.
+  Ahora el addon traduce el mensaje ("sube la Revisión en el panel de
+  Escena…") y el diálogo de export gana un checkbox real **«Reemplazar la
+  revisión ya publicada»** (`sobrescribir`) en vez de exigir flags de texto.
+  v1.2.1. Lección: cualquier mensaje que cruce del script/Worker al addon
+  necesita reescribirse en vocabulario de Blender, nunca pasar el HTTP/CLI
+  crudo al usuario.
 - F3 — HUD hi-tech completo. F4 — captura + deep links (el deep link ya
   existe; falta QR y captura). F5 — falta Whisper. F7 — gestos.
 

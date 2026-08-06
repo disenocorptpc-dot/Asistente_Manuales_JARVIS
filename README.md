@@ -38,9 +38,18 @@ botón **⬆ Cargar GLB** del HUD.
 - GLB **sin contrato**: modo inspección — cada mesh es pieza por su nombre,
   se asume 1 unidad = 1 m, con aviso visible.
 
-La pieza **se carga a mano**: el visor no trae ninguna precargada. El marcador,
-en cambio, se carga siempre — da pose y escala, nunca identidad, así que la
-misma hoja impresa sirve para cualquier GLB.
+La pieza **se carga a mano** con el botón ⬆, o desde el botón **📚 Catálogo**
+(lista lo publicado por el equipo, ver [F6](#contenido-publicado-f6) — toca
+una pieza y carga). El marcador, en cambio, se carga siempre — da pose y
+escala, nunca identidad, así que la misma hoja impresa sirve para cualquier
+GLB.
+
+Con un GLB cargado, mantén presionado el botón 🎤 y di un comando: *explota* ·
+*arma* · *órbita* / *alto* · *origen* · *uno a uno* / *mitad* / *décimo* ·
+*mesa* / *pared* · o el nombre de una capa. Vocabulario completo en
+[AGENTS.md](AGENTS.md#comandos-de-voz-publicappuivozjs-función-emparejar).
+El HUD trae sonido sintetizado (Web Audio, cero archivos); botón 🔇 para
+silenciarlo, se recuerda entre sesiones.
 
 El indicador de escala distingue **`1:1`** (derivado del ancho impreso del
 marcador, exacto por construcción) de **`≈ 1:1`** con borde punteado (estimado
@@ -74,10 +83,15 @@ herramientas/            ← FUERA de public
   generar-marcador.py        ← arte del marcador: generativo y determinista
   evaluar-marcador.py        ← validador de arte de marcadores (de Pipo)
   generar-glb-sintetico.py   ← GLB de prueba multi-pieza (Blender headless)
+  publicar-modelo.py         ← publicación modo local (con git), ver F6
   BRIEF-marcador.md          ← brief para diseño del arte del target
   test-extras.py             ← experimento: extras de escena en export glTF
   marcadores/                ← arte generado: 300 dpi, 32 px/cm y hoja A4
-wrangler.jsonc           ← Cloudflare Worker de assets estáticos
+  blender-addon/
+    jarvis_glb.py             ← addon: metadata + linter que bloquea + export Draco + publicar
+    probar_addon.py           ← suite de pruebas headless (24+ checks)
+src/worker.js            ← única ruta de código del Worker: PUT /api/publicar (F6)
+wrangler.jsonc           ← Cloudflare Worker de assets estáticos + esa ruta
 ```
 
 ## El marcador
@@ -108,35 +122,56 @@ protocolo de enganche impreso al lado.
 
 - **F0 ✅** — verificaciones §11, shell AR, core completo (carga dinámica de
   GLB, escala, explotado, capas, picking, fichas), verificado en navegador.
-- **F1 ✅ en código y desplegado** — arte del marcador validado, target
+- **F1 ✅ verificado en teléfono** — arte del marcador validado, target
   compilado, marcador desacoplado de la pieza, fórmula de escala normalizada,
   protocolo de enganche en la UI y distinción entre 1:1 medido y `≈ 1:1`
-  estimado. **⏳ Falta el teléfono:** imprimir la hoja al 100% y medir el 1:1
-  contra un objeto de dimensión conocida. El escritorio no valida tracking.
-- **F5 parcial adelantada** — voz push-to-talk (Web Speech API, es-MX,
-  vocabulario cerrado): mantén el 🎤 presionado y di *explota · arma · órbita ·
-  alto · uno a uno · mitad · décimo · mesa · pared* o el nombre de una capa del
-  GLB. Sin la API el botón desaparece solo; Whisper por Worker queda como
-  fallback para F6.
-- F2 — addon de Blender (metadata + linter) · F3 — HUD hi-tech completo ·
-  F4 — captura/deep links · F5 — voz (falta Whisper) · F6 — SharePoint ·
-  F7 — gestos.
+  estimado. Tag `v0.1.0`. Cuatro rondas de campo posteriores corrigieron
+  luces del shell AR (la escena de XR8 nace sin luces — todo se veía negro),
+  escalas 1:2/1:10, el signo del giro de orientación (empírico: 8th Wall usa
+  +Z donde ARKit usa −Z) y el texto de errores del addon — ver AGENTS.md.
+- **F2 ✅ addon de Blender** — paneles de metadata (Objeto/Escena), botón
+  «Prellenar desde nombres» (id/nombre del objeto, capa de su colección),
+  linter que **bloquea** el export (unidades, ids, capas, presupuestos,
+  texturas), export GLB con Draco automático, y botón «Publicar al visor»
+  que sube la pieza sin salir de Blender. Probado con 24+ checks headless.
+- **F5 parcial** — voz push-to-talk (Web Speech API, es-MX, vocabulario
+  cerrado — tabla completa en [AGENTS.md](AGENTS.md)) y sonido sintetizado
+  del HUD (Web Audio, cero archivos). Falta Whisper como fallback de voz
+  para iOS Safari.
+- **F6 ✅** — arquitectura de dos repos + publicación del equipo sin git (ver
+  abajo) + catálogo navegable en la app (botón 📚).
+- F3 — HUD hi-tech completo (leader lines, cotas 3D). F4 — captura de
+  foto/video + QR en los manuales (el deep link `?pieza=` ya existe).
+  F7 — gestos de mano.
 
-## Contenido publicado (F6)
+## Contenido publicado y pipeline del equipo (F6)
 
 Los GLB publicados viven en el repo hermano
 **[JARVIS-Modelos](https://github.com/disenocorptpc-dot/JARVIS-Modelos)**
 (privado), servido en `jarvis-modelos.disenocorptpc.workers.dev` con CORS y
-cache inmutable. Publicar:
+cache inmutable.
+
+**Un compañero del equipo publica sin git, sin clones, sin cuenta de GitHub:**
+instala el addon (descargable desde
+`/addon/jarvis_glb.py`, ver [guía de una hoja](public/guia-equipo.pdf)), pega
+el «token del equipo» en sus preferencias, y usa el checkbox «Publicar al
+visor» del export. El addon manda el GLB por HTTPS a `PUT /api/publicar`
+(`src/worker.js`), que arma un **commit atómico** en JARVIS-Modelos vía la
+Git Data API de GitHub (GLB + `piezas.json` juntos) usando un PAT que nunca
+sale del Worker. La CI de Cloudflare despliega y la pieza aparece en el
+Catálogo de todos en ~1 minuto.
+
+Publicar desde la terminal (modo avanzado, con los dos repos clonados):
 
 ```bash
 python herramientas/publicar-modelo.py pieza.glb --id SIG-LOBBY-01 --nombre "Señalización lobby" --rev R1
 ```
 
-El deep link `?pieza=<id>` consulta el catálogo remoto **sólo si hace falta**;
-si el worker de contenido no responde, el visor arranca normal y la carga
-manual con ⬆ sigue funcionando — el catálogo es aditivo por regla de diseño.
-El rail alternativo de publicación a R2 quedó estacionado en `src/worker.js`.
+El deep link `?pieza=<id>` y el botón 📚 Catálogo consultan el catálogo
+remoto **sólo si hace falta**; si el worker de contenido no responde, el
+visor arranca normal y la carga manual con ⬆ sigue funcionando — es aditivo
+por regla de diseño. El rail alternativo de publicación a R2 quedó
+estacionado en el historial de `src/worker.js` (no se usa: exige tarjeta).
 
 ## Deploy
 
