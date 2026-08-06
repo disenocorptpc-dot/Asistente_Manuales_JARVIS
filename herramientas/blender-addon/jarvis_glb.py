@@ -717,16 +717,30 @@ class JV_Preferencias(AddonPreferences):
     bl_idname = __name__
 
     repo_codigo: StringProperty(
-        name="Repo del visor (Asistente_Manuales_JARVIS)",
-        description="Para el botón publicar: ahí vive "
-                    "herramientas/publicar-modelo.py, y espera el repo de "
-                    "modelos como hermano (../JARVIS-Modelos)",
+        name="Carpeta LOCAL del repo del visor",
+        description="La carpeta en tu disco donde está clonado "
+                    "Asistente_Manuales_JARVIS (NO la URL de GitHub). El botón "
+                    "publicar corre herramientas/publicar-modelo.py de ahí, y "
+                    "espera el clon de JARVIS-Modelos como carpeta hermana",
         subtype="DIR_PATH",
         default="",
     )
 
     def draw(self, context):
-        self.layout.prop(self, "repo_codigo")
+        col = self.layout.column()
+        col.prop(self, "repo_codigo")
+        ruta = Path(self.repo_codigo) if self.repo_codigo else None
+        if not self.repo_codigo:
+            col.label(text="Elige la CARPETA del clon (icono de folder), no la URL de GitHub.",
+                      icon="INFO")
+        elif not (ruta / "herramientas" / "publicar-modelo.py").exists():
+            col.label(text="Ahí no veo herramientas/publicar-modelo.py — ¿es la carpeta correcta?",
+                      icon="ERROR")
+        elif not (ruta.parent / "JARVIS-Modelos" / "public" / "piezas.json").exists():
+            col.label(text="Falta el clon hermano JARVIS-Modelos junto a esta carpeta.",
+                      icon="ERROR")
+        else:
+            col.label(text="Listo: script y repo de modelos encontrados.", icon="CHECKMARK")
 
 
 def menu_export(self, context):
