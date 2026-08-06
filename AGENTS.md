@@ -125,6 +125,15 @@ python -m http.server 8317 --directory public
   `herramientas/marcadores/JARVIS-M23-hoja-A4-300dpi.png` al 100%, `wrangler
   deploy`, y medir el 1:1 en un teléfono real contra un objeto de dimensión
   conocida. El escritorio NO valida tracking.
+- **v0.1.0** — tag del primer 1:1 real verificado en teléfono (2026-08-06).
+- **Ronda de campo #1** (feedback del teléfono, mismo día): la escena de XR8
+  nace VACÍA y el GLB se veía NEGRO — las luces viven en cada shell y el AR no
+  tenía; ahora espeja las de desktop. Escalas 1:2 y 1:10 además del 1:1 (ver
+  piezas grandes de cerca). Grupo `orientado` en el grafo + botón «De pie»:
+  un marcador en pared muestra la pieza acostada porque el modelo se asienta
+  sobre el plano de la imagen (el tope de la imagen es -Z local; si en campo
+  la pieza cuelga hacia abajo, el signo va al revés en scene.js). Slider de
+  explotado con pulgar de 32 px.
 - F2 — addon de Blender (metadata + linter). F3 — HUD hi-tech completo.
   F4 — captura + deep links. F5–F7 — ver HANDOFF §12.
 

@@ -19,9 +19,14 @@
   "_marcadores_porque": "El marcador NO está amarrado a una pieza: da pose y escala 1:1, nunca identidad. Por eso vive aquí y no dentro de piezas[] — se carga el marcador siempre y el GLB llega aparte. Todos los registrados entran juntos a imageTargetData, así que varias hojas de manual anclan en el mismo visor. ancho_cm es el ancho del ÁREA TRACKEADA impresa (el crop compilado salió 480x640 sin recortar, así que coincide con el arte completo): de aquí sale el factor unidades/cm y si miente, el 1:1 miente. 15.0 x 20.0 cm no es gusto — 3:4 exacto porque el compilador fuerza el crop a height = width x 4/3, y 480 x 640 px a 32 px/cm es el mínimo que constants.json acepta. Ver herramientas/generar-marcador.py.",
 
   "escala": {
-    "modos": { "1:1": 1.0, "1:10": 0.1 },
+    "modos": { "1:1": 1.0, "1:2": 0.5, "1:10": 0.1 },
     "default": "1:1",
-    "_porque": "1:1 es el modo autorización (HANDOFF §4). El indicador de escala activa es permanente en el HUD: autorizar creyendo ver 1:1 en tabletop es el peor error posible."
+    "_porque": "1:1 es el modo autorización (HANDOFF §4). 1:2 y 1:10 son para revisar de cerca una pieza grande sin caminarla (pedido de campo 2026-08-06). El botón del HUD cicla los modos en este orden. El indicador de escala activa es permanente: autorizar creyendo ver 1:1 en cualquier modo reducido es el peor error posible."
+  },
+
+  "orientacion": {
+    "default": "plano",
+    "_porque": "Un marcador en PARED tiene la normal horizontal: el modelo Y-up se asienta sobre el plano de la imagen y se ve acostado. 'de_pie' gira -90° sobre X (el tope de la imagen es -Z local) para que la pieza quede vertical sobre la pared. Default plano porque en mesa/piso y en hitTest es lo correcto; el botón del HUD alterna."
   },
 
   "explotado": {

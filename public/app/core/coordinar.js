@@ -9,7 +9,7 @@ import { crearPicker } from './pick.js';
 import { crearEscala } from './scale.js';
 
 export function crearVisor(contenido) {
-  const grafo = crearGrafo();
+  const grafo = crearGrafo(contenido.orientacion);
   const escala = crearEscala(grafo, contenido.escala);
   const alCargar = [];
 

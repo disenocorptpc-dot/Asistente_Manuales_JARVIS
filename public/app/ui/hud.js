@@ -17,6 +17,7 @@ export function crearHUD(visor) {
     cargar: $('hud-cargar'),
     archivo: $('hud-archivo'),
     abajo: $('hud-abajo'),
+    orienta: $('hud-orienta'),
   };
 
   // ── Cargar GLB: el recurso llega del usuario, no de un catálogo.
@@ -69,10 +70,27 @@ export function crearHUD(visor) {
         : 'Escala aún sin referencia.';
   }
   el.escala.addEventListener('click', () => {
-    visor.escala.cambiarModo(visor.escala.modo === '1:1' ? '1:10' : '1:1');
+    // Cicla los modos en el orden de contenido.json: 1:1 → 1:2 → 1:10 → 1:1.
+    const modos = visor.escala.modos;
+    const i = modos.indexOf(visor.escala.modo);
+    visor.escala.cambiarModo(modos[(i + 1) % modos.length]);
     pintarEscala();
   });
   pintarEscala();
+
+  // ── Orientación: un marcador en pared muestra la pieza acostada (el modelo
+  //    se asienta sobre el plano de la imagen). El botón la para. Pedido de
+  //    campo 2026-08-06.
+  const ORIENTA = { plano: '▭ Plano', de_pie: '▯ De pie' };
+  function pintarOrienta() {
+    el.orienta.textContent = ORIENTA[visor.grafo.orientacion];
+    el.orienta.classList.toggle('activa', visor.grafo.orientacion === 'de_pie');
+  }
+  el.orienta.addEventListener('click', () => {
+    visor.grafo.orientar(visor.grafo.orientacion === 'plano' ? 'de_pie' : 'plano');
+    pintarOrienta();
+  });
+  pintarOrienta();
 
   // ── Explotado: slider físico y grande, tercio inferior, para el pulgar.
   el.slider.addEventListener('input', () => {

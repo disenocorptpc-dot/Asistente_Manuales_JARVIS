@@ -22,7 +22,7 @@ export function crearDebug(visor) {
     caja.querySelector('#dbg-info').textContent =
       `shell     ${shell?.nombre ?? 'arrancando'}${fallback ? ` (${fallback})` : ''}\n` +
       `ancla     ${ancla}\n` +
-      `escala    ${visor.escala.modo} · u/m ${visor.escala.unidadesPorMetro || '—'}\n` +
+      `escala    ${visor.escala.modo} · u/m ${visor.escala.unidadesPorMetro || '—'} · ${visor.grafo.orientacion}\n` +
       `explode   ${visor.explotado ? visor.explotado.factor.toFixed(2) : '—'}\n` +
       `piezas    ${visor.pieza?.piezas.size ?? 0} · capas ${visor.capas?.nombres().length ?? 0}\n` +
       `fps       ${medidor.fps}`;

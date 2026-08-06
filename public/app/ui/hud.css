@@ -115,7 +115,15 @@ body {
   opacity: 0; visibility: hidden; transition: opacity .25s;
 }
 #hud-abajo.visible { opacity: 1; visibility: visible; }
+#hud-fila-vista { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 #hud-capas { display: flex; gap: 8px; flex-wrap: wrap; }
+#hud-orienta {
+  font-size: 12.5px; letter-spacing: .04em; cursor: pointer;
+  color: var(--perla); background: var(--panel);
+  border: 1px solid var(--bronce);
+  padding: 8px 14px; border-radius: 999px;
+}
+#hud-orienta.activa { color: #0a1016; background: var(--bronce); }
 .capa {
   font-size: 12.5px; letter-spacing: .04em;
   color: var(--ligero); background: var(--panel);
@@ -132,7 +140,29 @@ body {
 #hud-explode-caja label {
   font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--bronce);
 }
-#hud-explode { flex: 1; accent-color: var(--bronce); height: 34px; }
+/* El slider se usa con el pulgar sosteniendo el teléfono con la misma mano:
+   pista fina para leer, pulgar GRANDE para atinar (pedido de campo 2026-08-06).
+   touch-action pan-y: el gesto horizontal es del slider, el vertical scrollea. */
+#hud-explode {
+  flex: 1; height: 46px; margin: 0;
+  -webkit-appearance: none; appearance: none;
+  background: transparent; touch-action: pan-y;
+}
+#hud-explode::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px; background: rgba(224, 229, 229, .35);
+}
+#hud-explode::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 32px; height: 32px; margin-top: -13px; border-radius: 50%;
+  background: var(--bronce); border: 2px solid #0a1016;
+}
+#hud-explode::-moz-range-track {
+  height: 6px; border-radius: 3px; background: rgba(224, 229, 229, .35);
+}
+#hud-explode::-moz-range-thumb {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--bronce); border: 2px solid #0a1016;
+}
 
 /* ── Ficha de pieza ─────────────────────────────────────────────── */
 #hud-ficha {

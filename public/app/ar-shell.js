@@ -99,6 +99,16 @@ export async function iniciarAR({ visor, hud, debug, contenido, motorListo }) {
         name: 'jarvis-visor',
         onStart: () => {
           const { scene, camera } = XR8.Threejs.xrScene();
+          /* La escena de XR8 nace VACÍA — sin luces. Un GLB con materiales PBR
+             se pinta NEGRO sin luz, y en escritorio nunca se nota porque el
+             shell de desktop trae las suyas. Mismas luces que desktop-shell.js
+             para que la pieza se vea igual en ambos shells. (Materiales con
+             metalness alto van a pedir environment map; se decide en F2 con
+             el addon, que es quien controla los materiales.) */
+          scene.add(new THREE.HemisphereLight(0xEDECE4, 0x254D6E, 1.1));
+          const sol = new THREE.DirectionalLight(0xffffff, 1.6);
+          sol.position.set(3, 6, 4);
+          scene.add(sol);
           scene.add(visor.grafo.ancla);
           camera.position.set(0, 1.6, 2);
           XR8.XrController.updateCameraProjectionMatrix({
