@@ -208,6 +208,32 @@ sí corren, y son las que se usaron para elegir la semilla.
   2026-08-06). `piezas: []` está vacío a propósito. El mecanismo de deep link
   `?pieza=` se queda para F4, pero no se precarga nada por default.
 
+## Dos repos: código y contenido (F6, decidido 2026-08-06)
+
+Los GLB publicados NO viven aquí — viven en
+**[JARVIS-Modelos](https://github.com/disenocorptpc-dot/JARVIS-Modelos)**
+(privado), servido por el worker `jarvis-modelos...workers.dev` (assets puros,
+CORS abierto, cache inmutable). Razones: ese repo engorda sin culpa y es
+desechable/reescribible (el visor lo consume por HTTP, no como dependencia);
+un PAT fine-grained de sólo ese repo publica modelos sin poder tocar código; y
+el GLB + su entrada en `piezas.json` viajan en el mismo commit (atómico).
+
+- **Publicar**: `python herramientas/publicar-modelo.py pieza.glb --id X
+  --nombre "…" --rev R1` — valida presupuestos, copia, registra, commitea y
+  `wrangler deploy` (ese deploy ES la publicación; el push es respaldo).
+  Espera el repo de modelos como hermano de éste (`../JARVIS-Modelos`).
+- **REGLA DE DISEÑO (pedida por el usuario): el catálogo es ADITIVO.** El
+  visor sólo lo consulta cuando llega `?pieza=` y no está en el registro
+  local; si el worker de contenido no responde, arranca normal y la carga
+  manual con ⬆ funciona igual. El visor JAMÁS depende del catálogo.
+- **El rail de R2 quedó ESTACIONADO**, completo y commiteado en
+  `src/worker.js` (PUT /api/publicar con token + candado de 9 GB). No se usa
+  porque R2 exige tarjeta. Si el repo de modelos pesa demasiado: activar R2,
+  crear bucket, restaurar `main` y `r2_buckets` en wrangler.jsonc (las
+  instrucciones están ahí en comentario). El secret PUBLICAR_TOKEN ya está
+  montado en el worker del visor y el token local en
+  `herramientas/.publicar.token` (gitignored).
+
 ## ⚠️ Un push a `main` es un deploy a producción
 
 El repo está conectado a **Cloudflare Workers Builds** — la CI de Cloudflare, no

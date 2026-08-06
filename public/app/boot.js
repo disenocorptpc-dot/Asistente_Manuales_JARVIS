@@ -37,10 +37,31 @@ motorListo.catch(() => {}); // si caemos a desktop, que no truene suelto
 
 const contenido = await fetch('contenido.json').then((r) => r.json());
 
-/* Deep link ?pieza= (F4): sólo aplica si contenido.json la registra. */
-const registro = params.get('pieza')
-  ? (contenido.piezas ?? []).find((p) => p.pieza_id === params.get('pieza')) ?? null
-  : null;
+/* Deep link ?pieza=: primero el registro local de contenido.json; si no está,
+   el catálogo remoto (repo JARVIS-Modelos). REGLA DE DISEÑO: el catálogo es
+   ADITIVO — sólo se consulta cuando hay ?pieza=, y cualquier falla (sin red,
+   worker caído, pieza inexistente) degrada a arrancar normal con carga
+   manual. El visor JAMÁS depende de él. */
+async function resolverPieza(piezaId) {
+  if (!piezaId) return null;
+  const local = (contenido.piezas ?? []).find((p) => p.pieza_id === piezaId);
+  if (local) return local;
+  if (!contenido.catalogo) return null;
+  try {
+    const base = new URL(contenido.catalogo);
+    const r = await fetch(new URL('piezas.json', base), { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const cat = await r.json();
+    const pieza = (cat.piezas ?? []).find((p) => p.pieza_id === piezaId);
+    if (!pieza) return null;
+    // El modelo se resuelve contra el ORIGEN del catálogo, no contra el visor.
+    return { ...pieza, modelo: new URL(pieza.modelo, base).href };
+  } catch (e) {
+    console.warn('[boot] catálogo no disponible (se sigue sin él):', e.message);
+    return null;
+  }
+}
+const registro = await resolverPieza(params.get('pieza'));
 
 /* ── Webview embebido: getUserMedia muere ahí sin siquiera preguntar ── */
 function esWebview() {

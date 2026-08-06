@@ -122,6 +122,22 @@ protocolo de enganche impreso al lado.
   F4 — captura/deep links · F5 — voz (falta Whisper) · F6 — SharePoint ·
   F7 — gestos.
 
+## Contenido publicado (F6)
+
+Los GLB publicados viven en el repo hermano
+**[JARVIS-Modelos](https://github.com/disenocorptpc-dot/JARVIS-Modelos)**
+(privado), servido en `jarvis-modelos.disenocorptpc.workers.dev` con CORS y
+cache inmutable. Publicar:
+
+```bash
+python herramientas/publicar-modelo.py pieza.glb --id SIG-LOBBY-01 --nombre "Señalización lobby" --rev R1
+```
+
+El deep link `?pieza=<id>` consulta el catálogo remoto **sólo si hace falta**;
+si el worker de contenido no responde, el visor arranca normal y la carga
+manual con ⬆ sigue funcionando — el catálogo es aditivo por regla de diseño.
+El rail alternativo de publicación a R2 quedó estacionado en `src/worker.js`.
+
 ## Deploy
 
 > ⚠️ **Un push a `main` es un deploy a producción.** El repo está conectado a

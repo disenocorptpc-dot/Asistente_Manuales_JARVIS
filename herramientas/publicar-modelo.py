@@ -1,85 +1,120 @@
-"""Publica un GLB al visor (R2 vía el Worker). El rail por el que correrá el
-botón "Exportar y publicar" del addon de Blender (F2); mientras, se usa a mano:
+"""Publica un GLB al visor — vía el repo de contenido JARVIS-Modelos.
 
-    python herramientas/publicar-modelo.py public/models/SIG-DEMO-01.glb --como SIG-DEMO-01-R1.glb
+    python herramientas/publicar-modelo.py pieza.glb --id SIG-LOBBY-01 --nombre "Señalización lobby" --rev R1
 
-El token vive en herramientas/.publicar.token (gitignored por *.token) o en la
-variable de entorno JARVIS_PUBLICAR_TOKEN. Se generó al configurar el Worker;
-si se pierde o se filtra: generar otro y `wrangler secret put PUBLICAR_TOKEN`.
+Qué hace, en orden:
+  1. Valida presupuestos ANTES de mover nada (≤15 MB aviso, 25 duro, nombre limpio).
+  2. Copia el GLB a JARVIS-Modelos/public/modelos/<ID>-<REV>.glb.
+  3. Registra/actualiza la pieza en public/piezas.json — GLB y registro viajan
+     en el MISMO commit: nunca hay registro sin modelo ni modelo sin registro.
+  4. Commit en el repo de modelos (y push si hay credenciales; si no, avisa —
+     el push es historia/respaldo, no publicación).
+  5. `wrangler deploy` — ESTE es el acto de publicar: el worker jarvis-modelos
+     sirve el contenido al visor.
 
-Reglas que este script hace cumplir ANTES de gastar red:
-- Sólo .glb, nombre limpio (letras/números/._-), porque el nombre es la URL.
+El repo de modelos se asume hermano de éste (../JARVIS-Modelos); --repo para
+otra ruta. Éste es el rail que usará el botón "Exportar y publicar" del addon
+de Blender (F2).
+
+Reglas que no se negocian:
 - Los publicados son INMUTABLES: revisión nueva = nombre nuevo (-R1, -R2…).
-  El Worker rechaza duplicados con 409; --sobrescribir es para el error honesto.
-- Presupuesto HANDOFF §10: aviso a partir de 15 MB, error duro en 25 MB.
+  El cache es de un año; reutilizar nombre sirve la versión vieja indefinido.
+- Los masters (.blend/FBX/PSD) NO se publican: esto es el entregable, como el
+  PDF lo es del .ai.
 """
 import argparse
+import datetime
 import json
-import os
 import re
+import shutil
+import subprocess
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
 
-WORKER = 'https://asistente-manuales-jarvis.disenocorptpc.workers.dev'
-NOMBRE_VALIDO = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.glb$')
 MB = 1024 * 1024
+ID_VALIDO = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$')
+REV_VALIDA = re.compile(r'^R[0-9]{1,3}$')
 
 
-def token():
-    t = os.environ.get('JARVIS_PUBLICAR_TOKEN', '').strip()
-    if t:
-        return t
-    archivo = Path(__file__).parent / '.publicar.token'
-    if archivo.exists():
-        return archivo.read_text(encoding='utf-8').strip()
-    sys.exit('sin token: define JARVIS_PUBLICAR_TOKEN o crea herramientas/.publicar.token')
+def correr(args, cwd):
+    r = subprocess.run(args, cwd=cwd, capture_output=True, text=True)
+    return r.returncode, (r.stdout + r.stderr).strip()
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('glb', help='ruta del GLB a publicar')
-    p.add_argument('--como', default=None,
-                   help='nombre con el que se publica (default: el del archivo). Versiónalo: PIEZA-R1.glb')
-    p.add_argument('--sobrescribir', action='store_true',
-                   help='reemplaza un publicado existente (para corregir un error, no para versionar)')
-    p.add_argument('--worker', default=WORKER)
+    p.add_argument('--id', required=True, help='pieza_id del contrato §6, p.ej. SIG-LOBBY-01')
+    p.add_argument('--nombre', required=True, help='nombre legible para el catálogo')
+    p.add_argument('--rev', required=True, help='revisión: R1, R2, …')
+    p.add_argument('--repo', default=None, help='ruta del repo JARVIS-Modelos (default: hermano de éste)')
+    p.add_argument('--sin-deploy', action='store_true', help='commitea pero no despliega (para agrupar varias piezas)')
     a = p.parse_args()
 
-    ruta = Path(a.glb)
-    if not ruta.exists():
-        sys.exit(f'no existe: {ruta}')
-    nombre = a.como or ruta.name
-    if not NOMBRE_VALIDO.match(nombre):
-        sys.exit(f'nombre inválido: "{nombre}" — letras/números/._- y extensión .glb')
+    if not ID_VALIDO.match(a.id):
+        sys.exit(f'pieza_id inválido: "{a.id}" (letras/números/._-)')
+    if not REV_VALIDA.match(a.rev):
+        sys.exit(f'revisión inválida: "{a.rev}" (formato R1, R2, …)')
 
-    datos = ruta.read_bytes()
-    if len(datos) > 25 * MB:
-        sys.exit(f'{len(datos)/MB:.1f} MB: el techo duro es 25 MB. Decimado + meshopt no es opcional (HANDOFF §10).')
-    if len(datos) > 15 * MB:
-        print(f'⚠ {len(datos)/MB:.1f} MB — excede el presupuesto de 15 MB (§10). En 4G son ~30 s de espera.')
+    origen = Path(a.glb)
+    if not origen.exists():
+        sys.exit(f'no existe: {origen}')
+    datos = origen.stat().st_size
+    if datos > 25 * MB:
+        sys.exit(f'{datos/MB:.1f} MB: techo duro 25 MB. Decimado + meshopt no es opcional (HANDOFF §10).')
+    if datos > 15 * MB:
+        print(f'⚠ {datos/MB:.1f} MB — excede el presupuesto de 15 MB (§10). En 4G son ~30 s de espera.')
 
-    if not nombre.lower().endswith(('.glb',)) or '-r' not in nombre.lower():
-        print(f'⚠ "{nombre}" no trae sufijo de revisión (-R1, -R2…). El cache es de un año: versionar el nombre es lo que permite corregir.')
+    repo = Path(a.repo) if a.repo else Path(__file__).resolve().parents[2] / 'JARVIS-Modelos'
+    catalogo_path = repo / 'public' / 'piezas.json'
+    if not catalogo_path.exists():
+        sys.exit(f'no encuentro el repo de modelos en {repo} — clónalo o pasa --repo')
 
-    url = f'{a.worker}/api/publicar?archivo={nombre}' + ('&sobrescribir=1' if a.sobrescribir else '')
-    peticion = urllib.request.Request(url, data=datos, method='PUT', headers={
-        'x-publicar-token': token(),
-        'Content-Type': 'model/gltf-binary',
-    })
-    try:
-        with urllib.request.urlopen(peticion, timeout=120) as r:
-            resp = json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        try:
-            detalle = json.loads(e.read()).get('error', '')
-        except Exception:
-            detalle = ''
-        sys.exit(f'HTTP {e.code}: {detalle or e.reason}')
+    archivo = f'{a.id}-{a.rev}.glb'
+    destino = repo / 'public' / 'modelos' / archivo
+    if destino.exists():
+        sys.exit(f'{archivo} ya está publicado. Una revisión nueva lleva nombre nuevo (¿--rev R{int(a.rev[1:])+1}?).')
 
-    print(f'✔ publicado: {resp["url"]}  ({resp["bytes"]/MB:.1f} MB)')
-    print(f'  siguiente paso → {resp["registrar"]}')
+    # 1-2. copiar
+    shutil.copyfile(origen, destino)
+
+    # 3. registrar (reemplaza la entrada del mismo pieza_id: el deep link
+    #    siempre apunta a la última revisión; las viejas siguen servidas por URL)
+    catalogo = json.loads(catalogo_path.read_text(encoding='utf-8'))
+    entrada = {
+        'pieza_id': a.id,
+        'nombre': a.nombre,
+        'modelo': f'modelos/{archivo}',
+        'revision': a.rev,
+        'publicado': datetime.date.today().isoformat(),
+    }
+    piezas = [q for q in catalogo.get('piezas', []) if q.get('pieza_id') != a.id]
+    piezas.append(entrada)
+    catalogo['piezas'] = sorted(piezas, key=lambda q: q['pieza_id'])
+    catalogo_path.write_text(json.dumps(catalogo, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+    # 4. commit (+push si se puede)
+    correr(['git', 'add', '-A'], repo)
+    c, salida = correr(['git', 'commit', '-m', f'publica {archivo}: {a.nombre} ({datos/MB:.1f} MB)'], repo)
+    if c != 0:
+        sys.exit(f'git commit falló:\n{salida}')
+    c, salida = correr(['git', 'push'], repo)
+    if c != 0:
+        print('⚠ push falló (¿sin credenciales?). El commit quedó local — pushea cuando puedas; '
+              'es respaldo/historia, la publicación es el deploy.')
+
+    # 5. deploy — el acto de publicar
+    if a.sin_deploy:
+        print('✔ commiteado. Sin deploy (--sin-deploy): nada visible aún.')
+        return
+    # En Windows npx es npx.cmd: which lo resuelve; a pelo, subprocess no lo halla.
+    npx = shutil.which('npx') or 'npx'
+    c, salida = correr([npx, 'wrangler', 'deploy'], repo)
+    if c != 0:
+        sys.exit(f'wrangler deploy falló:\n{salida[-600:]}')
+
+    print(f'✔ publicado: https://jarvis-modelos.disenocorptpc.workers.dev/modelos/{archivo}  ({datos/MB:.1f} MB)')
+    print(f'  deep link: https://asistente-manuales-jarvis.disenocorptpc.workers.dev/?pieza={a.id}')
 
 
 if __name__ == '__main__':

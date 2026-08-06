@@ -3,7 +3,10 @@
   "version": 1,
 
   "piezas": [],
-  "_piezas_porque": "Registro OPCIONAL para deep links ?pieza= (F4). Vacío a propósito: la pieza se carga a mano con el botón del HUD, así que el visor no trae ninguna precargada. Cada entrada: {pieza_id, nombre, modelo}.",
+  "_piezas_porque": "Registro local OPCIONAL para deep links ?pieza= (F4). Vacío a propósito: la pieza se carga a mano con el botón del HUD, así que el visor no trae ninguna precargada. Cada entrada: {pieza_id, nombre, modelo}. Se consulta ANTES que el catálogo remoto.",
+
+  "catalogo": "https://jarvis-modelos.disenocorptpc.workers.dev/",
+  "_catalogo_porque": "El repo de CONTENIDO (JARVIS-Modelos): piezas.json + GLBs publicados, servidos con CORS. Es ADITIVO por regla de diseño: sólo se consulta cuando llega ?pieza= en la URL y no está en el registro local; si no responde, el visor arranca normal y la carga manual con ⬆ funciona igual. Publicar una pieza no toca este repo.",
 
   "marcadores": [
     {
