@@ -74,6 +74,9 @@ export function crearHUD(visor, sonido = null, catalogoUrl = null) {
     // Lo más reciente arriba: es lo que se vino a enseñar.
     piezas.sort((a, b) => (b.publicado ?? '').localeCompare(a.publicado ?? ''));
     for (const p of piezas) {
+      const contenedor = document.createElement('div');
+      contenedor.className = 'lista-pieza-fila';
+
       const b = document.createElement('button');
       b.className = 'lista-pieza';
       const titulo = document.createElement('b');
@@ -91,7 +94,40 @@ export function crearHUD(visor, sonido = null, catalogoUrl = null) {
           sonido?.error();
         }
       });
-      el.lista.appendChild(b);
+
+      const btnBorrar = document.createElement('button');
+      btnBorrar.className = 'btn-borrar-pieza';
+      btnBorrar.title = `Eliminar ${p.nombre || p.pieza_id} del catálogo`;
+      btnBorrar.textContent = '🗑️';
+      btnBorrar.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const conf = confirm(`¿Eliminar "${p.nombre || p.pieza_id}" del catálogo permanentemente?`);
+        if (!conf) return;
+
+        btnBorrar.disabled = true;
+        btnBorrar.textContent = '⏳';
+        estado(`Eliminando ${p.nombre || p.pieza_id}…`);
+        const tokenVal = localStorage.getItem('jarvis_publicar_token') || '4c43f5eb410a963ec0f0ce8bef429888bd9e75a636333199aca382ea2990947a';
+        try {
+          const res = await fetch(`/api/publicar?pieza_id=${encodeURIComponent(p.pieza_id)}&token=${encodeURIComponent(tokenVal)}`, {
+            method: 'DELETE',
+          });
+          const resJson = await res.json();
+          if (!res.ok) throw new Error(resJson.error || 'Error al eliminar');
+
+          contenedor.remove();
+          estado(`✓ ${resJson.mensaje || 'Modelo eliminado de catálogo'}`);
+          sonido?.tick();
+        } catch (err) {
+          btnBorrar.disabled = false;
+          btnBorrar.textContent = '🗑️';
+          estado(`Error al eliminar: ${err.message}`);
+          sonido?.error();
+        }
+      });
+
+      contenedor.append(b, btnBorrar);
+      el.lista.appendChild(contenedor);
     }
   }
 

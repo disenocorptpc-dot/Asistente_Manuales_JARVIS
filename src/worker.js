@@ -26,10 +26,13 @@ const ID_VALIDO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/;
 const REV_VALIDA = /^R[0-9]{1,3}$/;
 const BYTES_MAX = 25 * 1024 * 1024; // techo duro; el presupuesto §10 es 15
 
-export default {
   async fetch(req, env) {
     const url = new URL(req.url);
-    if (url.pathname === '/api/publicar') return publicar(req, env, url);
+    if (url.pathname === '/api/publicar') {
+      if (req.method === 'PUT') return publicar(req, env, url);
+      if (req.method === 'DELETE') return eliminar(req, env, url);
+      return json(405, { error: 'método no permitido' });
+    }
     return new Response('no existe', { status: 404 });
   },
 };
@@ -197,4 +200,73 @@ function json(status, cuerpo) {
     status,
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
   });
+}
+
+async function eliminar(req, env, url) {
+  if (!env.PUBLICAR_TOKEN || !env.GITHUB_PAT_MODELOS)
+    return json(503, { error: 'eliminación sin configurar: faltan secrets en el Worker' });
+
+  const tokenHeaders = req.headers.get('x-publicar-token');
+  const tokenQuery = url.searchParams.get('token');
+  if (!tokenValido(tokenHeaders || tokenQuery, env.PUBLICAR_TOKEN))
+    return json(401, { error: 'token de publicación inválido' });
+
+  const piezaId = url.searchParams.get('pieza_id');
+  if (!piezaId) return json(400, { error: 'falta parámetro pieza_id' });
+
+  try {
+    const ref = await gh(env, `/git/ref/heads/${RAMA}`);
+    const baseSha = ref.object.sha;
+    const baseCommit = await gh(env, `/git/commits/${baseSha}`);
+
+    const catRaw = await gh(env, `/contents/public/piezas.json?ref=${baseSha}`);
+    const catalogo = JSON.parse(deB64(catRaw.content));
+
+    const piezaTarget = (catalogo.piezas ?? []).find((p) => p.pieza_id === piezaId);
+    if (!piezaTarget)
+      return json(404, { error: `La pieza "${piezaId}" no existe en el catálogo` });
+
+    catalogo.piezas = (catalogo.piezas ?? []).filter((p) => p.pieza_id !== piezaId);
+
+    const blobCat = await gh(env, '/git/blobs', {
+      content: JSON.stringify(catalogo, null, 2) + '\n',
+      encoding: 'utf-8',
+    });
+
+    const treeChanges = [
+      { path: 'public/piezas.json', mode: '100644', type: 'blob', sha: blobCat.sha },
+    ];
+
+    if (piezaTarget.modelo && piezaTarget.modelo.startsWith('modelos/')) {
+      treeChanges.push({
+        path: `public/${piezaTarget.modelo}`,
+        mode: '100644',
+        type: 'blob',
+        sha: null,
+      });
+    }
+
+    const arbol = await gh(env, '/git/trees', {
+      base_tree: baseCommit.tree.sha,
+      tree: treeChanges,
+    });
+
+    const commit = await gh(env, '/git/commits', {
+      message: `elimina ${piezaId}: ${piezaTarget.nombre || piezaId} (vía Worker)`,
+      tree: arbol.sha,
+      parents: [baseSha],
+    });
+
+    await gh(env, `/git/refs/heads/${RAMA}`, { sha: commit.sha }, 'PATCH');
+
+    return json(200, {
+      ok: true,
+      pieza_id: piezaId,
+      nombre: piezaTarget.nombre,
+      commit: commit.sha.slice(0, 7),
+      mensaje: `Pieza "${piezaTarget.nombre || piezaId}" eliminada del catálogo`,
+    });
+  } catch (e) {
+    return json(502, { error: `Error eliminando pieza: ${e.message}` });
+  }
 }

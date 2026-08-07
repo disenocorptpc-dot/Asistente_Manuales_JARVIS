@@ -92,6 +92,12 @@ body {
   font-size: 13px; color: var(--ligero);
 }
 #hud-lista.visible { display: flex; }
+.lista-pieza-fila {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+}
+.lista-pieza-fila .lista-pieza {
+  flex: 1;
+}
 .lista-pieza {
   display: flex; flex-direction: column; gap: 3px; text-align: left;
   color: var(--perla); background: rgba(37, 77, 110, .35);
@@ -101,6 +107,24 @@ body {
 .lista-pieza:active { transform: scale(.99); }
 .lista-pieza b { font-size: 14px; font-weight: 600; }
 .lista-pieza span { font-size: 11px; color: var(--ligero); opacity: .75; }
+.btn-borrar-pieza {
+  background: rgba(220, 38, 38, 0.15);
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  color: #ef4444;
+  transition: all 0.15s ease;
+  display: flex; align-items: center; justify-content: center;
+}
+.btn-borrar-pieza:hover {
+  background: rgba(220, 38, 38, 0.35);
+  border-color: #ef4444;
+}
+.btn-borrar-pieza:disabled {
+  opacity: 0.5; cursor: not-allowed;
+}
 #hud-escala {
   pointer-events: auto; cursor: pointer;
   font: 700 18px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
