@@ -51,7 +51,7 @@ from mathutils import Vector
 bl_info = {
     "name": "JARVIS — GLB con contrato (Palace)",
     "author": "Coordinación de Diseño Industrial y 3D — The Palace Company",
-    "version": (1, 5, 0),
+    "version": (1, 6, 0),
     "blender": (4, 2, 0),
     "location": "Propiedades > Objeto / Escena · File > Export > GLB JARVIS",
     "description": "Metadata de producción + linter que bloquea + export GLB "
@@ -166,6 +166,91 @@ class JV_PiezaMeta(PropertyGroup):
     )
 
 
+def actualizar_despiece_blender(scene, factor):
+    """Actualiza la vista 3D en vivo de Blender desplazando mallas según su metadato."""
+    import math
+    from mathutils import Vector, Euler, Matrix
+
+    objs = [o for o in scene.objects if o.type in TIPOS_GEOMETRIA]
+    if not objs:
+        return
+
+    # Calcular centro de la escena para despiece radial si aplica
+    centro_escena = Vector((0.0, 0.0, 0.0))
+    count = 0
+    for o in objs:
+        if hasattr(o, "jarvis_meta") and o.jarvis_meta.incluir:
+            centro_escena += o.location
+            count += 1
+    if count > 0:
+        centro_escena /= count
+
+    for o in objs:
+        if not hasattr(o, "jarvis_meta"):
+            continue
+        m = o.jarvis_meta
+        if not m.incluir:
+            continue
+
+        # Guardar pose de reposo si no está registrada
+        if "_jarvis_reposo_loc" not in o.keys():
+            o["_jarvis_reposo_loc"] = list(o.location)
+            o["_jarvis_reposo_rot"] = list(o.rotation_euler)
+
+        base_loc = Vector(o["_jarvis_reposo_loc"])
+        base_rot = Euler(o["_jarvis_reposo_rot"])
+
+        if factor <= 0.0:
+            o.location = base_loc
+            o.rotation_euler = base_rot
+            continue
+
+        # Calcular dirección y distancia
+        if m.usar_explode:
+            d = m.explode_direccion
+            if d == "estatico":
+                dir_vec = Vector((0.0, 0.0, 0.0))
+                dist_m = 0.0
+            elif d == "arriba":
+                dir_vec = Vector((0.0, 0.0, 1.0))
+                dist_m = m.explode_dist_cm / 100.0
+            elif d == "abajo":
+                dir_vec = Vector((0.0, 0.0, -1.0))
+                dist_m = m.explode_dist_cm / 100.0
+            elif d == "adelante":
+                dir_vec = Vector((0.0, -1.0, 0.0))
+                dist_m = m.explode_dist_cm / 100.0
+            elif d == "atras":
+                dir_vec = Vector((0.0, 1.0, 0.0))
+                dist_m = m.explode_dist_cm / 100.0
+            elif d == "derecha":
+                dir_vec = Vector((1.0, 0.0, 0.0))
+                dist_m = m.explode_dist_cm / 100.0
+            elif d == "izquierda":
+                dir_vec = Vector((-1.0, 0.0, 0.0))
+                dist_m = m.explode_dist_cm / 100.0
+            else:
+                v = Vector(m.explode_vector)
+                dir_vec = v.normalized() if v.length > 0 else Vector((0.0, 0.0, 1.0))
+                dist_m = m.explode_dist_cm / 100.0
+        else:
+            diff = o.location - centro_escena
+            dir_vec = diff.normalized() if diff.length > 1e-5 else Vector((0.0, 0.0, 1.0))
+            dist_m = 0.25
+
+        o.location = base_loc + dir_vec * (dist_m * factor)
+
+        if m.usar_explode and m.anim_giro and d != "estatico" and dir_vec.length > 0:
+            ang = factor * m.anim_giros_cant * (2.0 * math.pi)
+            rot_matrix = Matrix.Rotation(ang, 4, dir_vec)
+            m_base = base_rot.to_matrix().to_4x4()
+            o.rotation_euler = (rot_matrix @ m_base).to_euler()
+
+
+def _actualizar_explode_escena_cb(self, context):
+    actualizar_despiece_blender(context.scene, self.factor_explode)
+
+
 class JV_EscenaMeta(PropertyGroup):
     """Identidad del ensamble. Se llena una vez y vive en el .blend."""
 
@@ -201,6 +286,12 @@ class JV_EscenaMeta(PropertyGroup):
         default="R1",
     )
     autor: StringProperty(name="Autor", default="")
+    factor_explode: FloatProperty(
+        name="Factor de explotado",
+        description="Simula el despiece explosionado directamente en el visor de Blender para renders",
+        default=0.0, min=0.0, max=1.0, subtype="FACTOR",
+        update=_actualizar_explode_escena_cb,
+    )
 
 
 # ───────── Selección de qué exporta ─────────
@@ -408,6 +499,20 @@ class JV_PT_objeto(Panel):
                     exp.prop(m, "anim_giros_cant")
 
 
+class JV_OT_restablecer_armado(Operator):
+    """Restablece todas las piezas a su posición armada original (0%)"""
+    bl_idname = "scene.jarvis_restablecer_armado"
+    bl_label = "Restablecer a Armado (0%)"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        sc = context.scene
+        sc.jarvis_meta.factor_explode = 0.0
+        actualizar_despiece_blender(sc, 0.0)
+        self.report({"INFO"}, "Piezas restablecidas a 100% armado")
+        return {"FINISHED"}
+
+
 class JV_PT_escena(Panel):
     bl_label = "JARVIS — ensamble"
     bl_idname = "SCENE_PT_jarvis"
@@ -432,6 +537,12 @@ class JV_PT_escena(Panel):
         fila = col.row(align=True)
         fila.operator(JV_OT_prellenar.bl_idname, icon="OUTLINER_OB_GROUP_INSTANCE")
         fila.operator(JV_OT_revisar.bl_idname, icon="CHECKMARK")
+        col.separator()
+
+        box_exp = col.box()
+        box_exp.label(text="Previsualización de Despiece (Renders)", icon="FULLSCREEN_ENTER")
+        box_exp.prop(em, "factor_explode", slider=True)
+        box_exp.operator(JV_OT_restablecer_armado.bl_idname, icon="LOOP_BACK")
 
         # El último veredicto del linter, si existe (lo guarda Revisar/Export).
         wm = context.window_manager
@@ -1008,6 +1119,7 @@ CLASSES = (
     JV_EscenaMeta,
     JV_PT_objeto,
     JV_PT_escena,
+    JV_OT_restablecer_armado,
     JV_OT_prellenar,
     JV_OT_revisar,
     JV_OT_export,
