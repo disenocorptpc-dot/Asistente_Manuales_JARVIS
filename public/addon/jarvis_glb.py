@@ -620,6 +620,14 @@ class JV_OT_export(Operator, ExportHelper):
         if v_anclaje == "punto_named":
             escena_extras["anclaje_punto"] = v_anclaje_punto
 
+        # Retrocompatibilidad con Asistente de Manuales 2.0
+        escena_extras["mn_proyecto"] = json.dumps({
+            "nombre": v_pieza_nombre or v_pieza_id,
+            "propiedad": v_proyecto,
+            "revision": v_revision,
+            "autor": v_autor,
+        }, ensure_ascii=False)
+
         seleccion_previa = list(context.selected_objects)
         activo_previo = context.view_layer.objects.active
 
@@ -658,6 +666,20 @@ class JV_OT_export(Operator, ExportHelper):
                 if m.usar_explode:
                     extras["explode_vector"] = list(m.explode_vector)
                     extras["explode_dist_cm"] = round(m.explode_dist_cm, 2)
+
+                # Retrocompatibilidad con Asistente de Manuales 2.0
+                extras["mn_meta"] = json.dumps({
+                    "nombre": m.pieza_nombre.strip() or o.name,
+                    "pieza_id": m.pieza_id.strip(),
+                    "capa": m.capa.strip(),
+                    "cantidad": m.cantidad,
+                    "material": m.material.strip(),
+                    "proceso": m.proceso.strip(),
+                    "acabado": m.acabado.strip(),
+                    "orden_ensamble": m.orden_ensamble,
+                    "nota_taller": m.nota_taller.strip(),
+                }, ensure_ascii=False)
+
                 estampar(o, extras)
 
             # Exportar sólo las piezas (+ el Empty de anclaje si aplica):
