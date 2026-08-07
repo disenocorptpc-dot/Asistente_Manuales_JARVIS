@@ -51,7 +51,7 @@ from mathutils import Vector
 bl_info = {
     "name": "JARVIS — GLB con contrato (Palace)",
     "author": "Coordinación de Diseño Industrial y 3D — The Palace Company",
-    "version": (1, 3, 1),
+    "version": (1, 3, 2),
     "blender": (4, 2, 0),
     "location": "Propiedades > Objeto / Escena · File > Export > GLB JARVIS",
     "description": "Metadata de producción + linter que bloquea + export GLB "
@@ -461,6 +461,13 @@ tú corriges lo que haya adivinado mal"""
                 col = o.users_collection[0].name if o.users_collection else ""
                 m.capa = col if col not in ("", "Scene Collection", "Collection") else "General"
                 toco = True
+            if not m.material.strip():
+                # Toma automáticamente el nombre del primer material asignado en Blender
+                if o.data and hasattr(o.data, "materials") and o.data.materials and o.data.materials[0]:
+                    mat_obj = o.data.materials[0]
+                    if mat_obj and mat_obj.name:
+                        m.material = mat_obj.name.replace("_", " ").replace(".", " ").strip()
+                        toco = True
             if toco:
                 llenados += 1
 
@@ -657,10 +664,18 @@ class JV_OT_export(Operator, ExportHelper):
                     "capa": m.capa.strip(),
                     "cantidad": m.cantidad,
                 }
-                for campo in ("material", "proceso", "acabado", "nota_taller"):
+                mat_nombre = m.material.strip()
+                if not mat_nombre and o.data and hasattr(o.data, "materials") and o.data.materials and o.data.materials[0]:
+                    if o.data.materials[0] and o.data.materials[0].name:
+                        mat_nombre = o.data.materials[0].name.replace("_", " ").replace(".", " ").strip()
+
+                for campo in ("proceso", "acabado", "nota_taller"):
                     v = getattr(m, campo).strip()
                     if v:
                         extras[campo] = v
+                if mat_nombre:
+                    extras["material"] = mat_nombre
+
                 if m.orden_ensamble > 0:
                     extras["orden_ensamble"] = m.orden_ensamble
                 if m.usar_explode:
@@ -676,7 +691,7 @@ class JV_OT_export(Operator, ExportHelper):
                     "pieza_id": m.pieza_id.strip(),
                     "capa": m.capa.strip(),
                     "cantidad": m.cantidad,
-                    "material": m.material.strip(),
+                    "material": mat_nombre,
                     "proceso": m.proceso.strip(),
                     "acabado": m.acabado.strip(),
                     "orden_ensamble": m.orden_ensamble,
