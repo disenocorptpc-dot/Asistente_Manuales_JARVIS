@@ -26,6 +26,7 @@ const ID_VALIDO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/;
 const REV_VALIDA = /^R[0-9]{1,3}$/;
 const BYTES_MAX = 25 * 1024 * 1024; // techo duro; el presupuesto §10 es 15
 
+export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (url.pathname === '/api/publicar') {
