@@ -35,8 +35,13 @@ export function crearExplotado(pieza, opciones = {}) {
     const aLocal = new THREE.Matrix3().setFromMatrix4(obj.parent.matrixWorld).invert();
     direccion.applyMatrix3(aLocal).normalize();
 
-    rutas.set(id, { direccion, distancia });
+    const girar = Boolean(d.anim_giro);
+    const giros = typeof d.anim_giros_cant === 'number' && d.anim_giros_cant > 0 ? d.anim_giros_cant : 3;
+
+    rutas.set(id, { direccion, distancia, girar, giros });
   }
+
+  const _qGiro = new THREE.Quaternion();
 
   let factor = 0;
   return {
@@ -46,8 +51,16 @@ export function crearExplotado(pieza, opciones = {}) {
       factor = THREE.MathUtils.clamp(t, 0, 1);
       for (const [id, obj] of pieza.piezas) {
         const base = pieza.reposo.get(id);
+        const baseRot = pieza.reposoRot?.get(id);
         const ruta = rutas.get(id);
+
         obj.position.copy(base).addScaledVector(ruta.direccion, ruta.distancia * factor);
+
+        if (ruta.girar && baseRot && ruta.direccion.lengthSq() > 0) {
+          const angulo = factor * (ruta.giros * Math.PI * 2);
+          _qGiro.setFromAxisAngle(ruta.direccion, angulo);
+          obj.quaternion.copy(baseRot).premultiply(_qGiro);
+        }
       }
     },
   };

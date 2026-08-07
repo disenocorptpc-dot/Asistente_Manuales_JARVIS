@@ -58,12 +58,16 @@ export async function cargarPieza(url, nombreArchivo = '') {
 
   recentrarPivote(modelo, meta.anclaje ?? 'base_centro');
 
-  // Posición de reposo de cada pieza, para que el explotado tenga a dónde volver.
+  // Posición y orientación de reposo de cada pieza, para que el explotado tenga a dónde volver.
   const reposo = new Map();
-  for (const [id, obj] of piezas) reposo.set(id, obj.position.clone());
+  const reposoRot = new Map();
+  for (const [id, obj] of piezas) {
+    reposo.set(id, obj.position.clone());
+    reposoRot.set(id, obj.quaternion.clone());
+  }
 
   const nombre = meta.pieza_nombre ?? nombreArchivo ?? 'GLB';
-  return { modelo, meta, piezas, reposo, avisos, conContrato, nombre };
+  return { modelo, meta, piezas, reposo, reposoRot, avisos, conContrato, nombre };
 }
 
 /* El equivalente GLB del translate(0,0.5,0) de Pipo: la pieza se asienta

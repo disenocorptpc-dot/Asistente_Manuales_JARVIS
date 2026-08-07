@@ -51,7 +51,7 @@ from mathutils import Vector
 bl_info = {
     "name": "JARVIS — GLB con contrato (Palace)",
     "author": "Coordinación de Diseño Industrial y 3D — The Palace Company",
-    "version": (1, 4, 0),
+    "version": (1, 5, 0),
     "blender": (4, 2, 0),
     "location": "Propiedades > Objeto / Escena · File > Export > GLB JARVIS",
     "description": "Metadata de producción + linter que bloquea + export GLB "
@@ -153,6 +153,16 @@ class JV_PiezaMeta(PropertyGroup):
     explode_dist_cm: FloatProperty(
         name="Distancia (cm)",
         default=12.0, min=0.0, soft_max=100.0,
+    )
+    anim_giro: BoolProperty(
+        name="Girar al despiezar (Rosca)",
+        description="Gira la pieza sobre su eje de desplazamiento durante el despiece (ideal para tornillería, tuercas y herrajes)",
+        default=False,
+    )
+    anim_giros_cant: IntProperty(
+        name="Vueltas",
+        description="Número de vueltas completas (360°) durante la animación de despiece",
+        default=3, min=1, max=20,
     )
 
 
@@ -393,6 +403,9 @@ class JV_PT_objeto(Panel):
                 exp.prop(m, "explode_vector")
             if m.explode_direccion != "estatico":
                 exp.prop(m, "explode_dist_cm")
+                exp.prop(m, "anim_giro")
+                if m.anim_giro:
+                    exp.prop(m, "anim_giros_cant")
 
 
 class JV_PT_escena(Panel):
@@ -704,7 +717,7 @@ class JV_OT_export(Operator, ExportHelper):
                     if d == "estatico":
                         v_vec = [0.0, 0.0, 0.0]
                         dist_val = 0.0
-                    elif d == "arriba":
+                    elif d == "arriba" and list(m.explode_vector) == [0.0, 0.0, 1.0]:
                         v_vec = [0.0, 0.0, 1.0]
                         dist_val = round(m.explode_dist_cm, 2)
                     elif d == "abajo":
@@ -728,8 +741,14 @@ class JV_OT_export(Operator, ExportHelper):
 
                     extras["explode_vector"] = v_vec
                     extras["explode_dist_cm"] = dist_val
+                    if m.anim_giro and d != "estatico":
+                        extras["anim_giro"] = True
+                        extras["anim_giros_cant"] = m.anim_giros_cant
+                    else:
+                        extras["anim_giro"] = False
                 else:
                     extras["usar_explode"] = False
+                    extras["anim_giro"] = False
                     v_vec = None
                     dist_val = None
 
@@ -748,6 +767,8 @@ class JV_OT_export(Operator, ExportHelper):
                     "explode_direccion": m.explode_direccion if m.usar_explode else "auto",
                     "explode_vector": v_vec,
                     "explode_dist_cm": dist_val,
+                    "anim_giro": m.anim_giro if m.usar_explode and m.explode_direccion != "estatico" else False,
+                    "anim_giros_cant": m.anim_giros_cant if m.anim_giro else 0,
                 }, ensure_ascii=False)
 
                 estampar(o, extras)
