@@ -51,7 +51,7 @@ from mathutils import Vector
 bl_info = {
     "name": "JARVIS — GLB con contrato (Palace)",
     "author": "Coordinación de Diseño Industrial y 3D — The Palace Company",
-    "version": (1, 3, 0),
+    "version": (1, 3, 1),
     "blender": (4, 2, 0),
     "location": "Propiedades > Objeto / Escena · File > Export > GLB JARVIS",
     "description": "Metadata de producción + linter que bloquea + export GLB "
@@ -664,8 +664,11 @@ class JV_OT_export(Operator, ExportHelper):
                 if m.orden_ensamble > 0:
                     extras["orden_ensamble"] = m.orden_ensamble
                 if m.usar_explode:
+                    extras["usar_explode"] = True
                     extras["explode_vector"] = list(m.explode_vector)
                     extras["explode_dist_cm"] = round(m.explode_dist_cm, 2)
+                else:
+                    extras["usar_explode"] = False
 
                 # Retrocompatibilidad con Asistente de Manuales 2.0
                 extras["mn_meta"] = json.dumps({
@@ -678,6 +681,9 @@ class JV_OT_export(Operator, ExportHelper):
                     "acabado": m.acabado.strip(),
                     "orden_ensamble": m.orden_ensamble,
                     "nota_taller": m.nota_taller.strip(),
+                    "usar_explode": m.usar_explode,
+                    "explode_vector": list(m.explode_vector) if m.usar_explode else None,
+                    "explode_dist_cm": round(m.explode_dist_cm, 2) if m.usar_explode else None,
                 }, ensure_ascii=False)
 
                 estampar(o, extras)
