@@ -724,10 +724,10 @@ class JV_OT_export(Operator, ExportHelper):
                         v_vec = [0.0, 0.0, -1.0]
                         dist_val = round(m.explode_dist_cm, 2)
                     elif d == "adelante":
-                        v_vec = [0.0, 1.0, 0.0]
+                        v_vec = [0.0, -1.0, 0.0]  # Blender -Y es al frente / adelante
                         dist_val = round(m.explode_dist_cm, 2)
                     elif d == "atras":
-                        v_vec = [0.0, -1.0, 0.0]
+                        v_vec = [0.0, 1.0, 0.0]   # Blender +Y es hacia atrás / al fondo
                         dist_val = round(m.explode_dist_cm, 2)
                     elif d == "derecha":
                         v_vec = [1.0, 0.0, 0.0]

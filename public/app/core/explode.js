@@ -18,7 +18,8 @@ export function crearExplotado(pieza, opciones = {}) {
     let direccion, distancia;
 
     if (Array.isArray(d.explode_vector) && d.explode_vector.length === 3) {
-      direccion = new THREE.Vector3(...d.explode_vector).normalize();
+      const v = d.explode_vector;
+      direccion = new THREE.Vector3(v[0] || 0, v[2] || 0, -(v[1] || 0)).normalize();
       distancia = (d.explode_dist_cm ?? distDefaultCm) / 100;
     } else {
       _caja.setFromObject(obj);
