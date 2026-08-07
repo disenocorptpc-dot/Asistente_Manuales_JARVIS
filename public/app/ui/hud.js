@@ -7,6 +7,7 @@
 export function crearHUD(visor, sonido = null, catalogoUrl = null) {
   const $ = (id) => document.getElementById(id);
   const el = {
+    modoVista: $('hud-modo-vista'),
     catalogo: $('hud-catalogo'),
     lista: $('hud-lista'),
     escala: $('hud-escala'),
@@ -22,6 +23,23 @@ export function crearHUD(visor, sonido = null, catalogoUrl = null) {
     orienta: $('hud-orienta'),
     sonido: $('hud-sonido'),
   };
+
+  // ── Conmutador de modos de vista (Normal / Wireframe / Random Colors)
+  if (el.modoVista) {
+    const MODOS = [
+      { id: 'normal', label: '🎨 Normal' },
+      { id: 'wireframe', label: '🕸️ Malla' },
+      { id: 'random', label: '🌈 Colores' },
+    ];
+    let idxModo = 0;
+    el.modoVista.addEventListener('click', () => {
+      idxModo = (idxModo + 1) % MODOS.length;
+      const m = MODOS[idxModo];
+      el.modoVista.textContent = m.label;
+      visor.setModoVista(m.id);
+      sonido?.tick();
+    });
+  }
 
   // ── Silencio persistente. Sin Web Audio (o sin módulo), el botón sobra.
   if (sonido) {

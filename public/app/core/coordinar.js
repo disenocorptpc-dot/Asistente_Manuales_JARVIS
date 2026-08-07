@@ -1,6 +1,7 @@
 /* Ensambla el core alrededor de un GLB que puede llegar DESPUÉS del arranque
    (botón "Cargar GLB" del HUD, deep link, o SharePoint en F6). Es el único
    punto donde los módulos del core se conocen entre sí. */
+import * as THREE from 'three';
 import { cargarPieza } from './loader.js';
 import { crearGrafo } from './scene.js';
 import { crearExplotado } from './explode.js';
@@ -34,6 +35,42 @@ export function crearVisor(contenido) {
     if (tween.t >= 1) tween = null;
   });
 
+  let modoVistaActual = 'normal';
+
+  function aplicarModoVista(modo) {
+    modoVistaActual = modo;
+    if (!pieza || !pieza.modelo) return;
+
+    pieza.modelo.traverse((obj) => {
+      if (obj.isMesh) {
+        if (!obj.userData._matOriginal) {
+          obj.userData._matOriginal = obj.material;
+        }
+
+        if (modo === 'wireframe') {
+          obj.material = new THREE.MeshStandardMaterial({
+            color: 0x38bdf8,
+            wireframe: true,
+            roughness: 0.5,
+          });
+        } else if (modo === 'random') {
+          const id = obj.userData.pieza_id || obj.name || String(obj.id);
+          let hash = 0;
+          for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+          const hue = Math.abs(hash % 360) / 360;
+          const color = new THREE.Color().setHSL(hue, 0.8, 0.55);
+          obj.material = new THREE.MeshStandardMaterial({
+            color,
+            roughness: 0.35,
+            metalness: 0.1,
+          });
+        } else {
+          obj.material = obj.userData._matOriginal;
+        }
+      }
+    });
+  }
+
   return {
     grafo,
     escala,
@@ -43,6 +80,8 @@ export function crearVisor(contenido) {
     get capas() { return capas; },
     get picker() { return picker; },
     get cargado() { return !!pieza; },
+    get modoVista() { return modoVistaActual; },
+    setModoVista(modo) { aplicarModoVista(modo); },
 
     /* El HUD (y el reencuadre del shell desktop) se enteran aquí. */
     onCargar(fn) { alCargar.push(fn); },
@@ -71,6 +110,7 @@ export function crearVisor(contenido) {
       picker = crearPicker(pieza);
       tween = null;
       orbita.reiniciar(); // la pieza nueva entra de frente, no girando
+      aplicarModoVista(modoVistaActual);
       for (const fn of alCargar) fn(pieza);
       return pieza;
     },
