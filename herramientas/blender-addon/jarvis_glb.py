@@ -51,7 +51,7 @@ from mathutils import Vector
 bl_info = {
     "name": "JARVIS — GLB con contrato (Palace)",
     "author": "Coordinación de Diseño Industrial y 3D — The Palace Company",
-    "version": (1, 3, 2),
+    "version": (1, 4, 0),
     "blender": (4, 2, 0),
     "location": "Propiedades > Objeto / Escena · File > Export > GLB JARVIS",
     "description": "Metadata de producción + linter que bloquea + export GLB "
@@ -125,11 +125,27 @@ class JV_PiezaMeta(PropertyGroup):
         name="Override de explotado",
         description="Sin esto el visor calcula el despiece procedural "
                     "(radial desde el centro). Enciéndelo exactamente donde "
-                    "el radial se ve mal",
+                    "el radial se ve mal o quieras fijar una pieza estática",
         default=False,
     )
-    explode_vector: FloatVectorProperty(
+    explode_direccion: EnumProperty(
         name="Dirección",
+        description="Dirección rápida de despiece o pieza estática",
+        items=[
+            ("estatico", "Estático (Fijo en su lugar)",
+             "La pieza no se desplaza en la vista explosionada (0 cm)"),
+            ("arriba", "Arriba (+Z)", "Desplaza hacia arriba (+Z)"),
+            ("abajo", "Abajo (-Z)", "Desplaza hacia abajo (-Z)"),
+            ("adelante", "Adelante (+Y)", "Desplaza hacia adelante (+Y)"),
+            ("atras", "Atrás (-Y)", "Desplaza hacia atrás (-Y)"),
+            ("derecha", "Derecha (+X)", "Desplaza a la derecha (+X)"),
+            ("izquierda", "Izquierda (-X)", "Desplaza a la izquierda (-X)"),
+            ("custom", "Personalizado (XYZ)", "Define vector 3D numérico manual"),
+        ],
+        default="arriba",
+    )
+    explode_vector: FloatVectorProperty(
+        name="Vector 3D",
         description="En el espacio del modelo, Z-up de Blender (el exportador "
                     "convierte a Y-up del visor)",
         size=3, default=(0.0, 0.0, 1.0), subtype="XYZ",
@@ -371,8 +387,12 @@ class JV_PT_objeto(Panel):
         sub.prop(m, "usar_explode")
         exp = sub.column()
         exp.enabled = m.usar_explode
-        exp.prop(m, "explode_vector")
-        exp.prop(m, "explode_dist_cm")
+        if m.usar_explode:
+            exp.prop(m, "explode_direccion")
+            if m.explode_direccion == "custom":
+                exp.prop(m, "explode_vector")
+            if m.explode_direccion != "estatico":
+                exp.prop(m, "explode_dist_cm")
 
 
 class JV_PT_escena(Panel):
@@ -680,10 +700,38 @@ class JV_OT_export(Operator, ExportHelper):
                     extras["orden_ensamble"] = m.orden_ensamble
                 if m.usar_explode:
                     extras["usar_explode"] = True
-                    extras["explode_vector"] = list(m.explode_vector)
-                    extras["explode_dist_cm"] = round(m.explode_dist_cm, 2)
+                    d = m.explode_direccion
+                    if d == "estatico":
+                        v_vec = [0.0, 0.0, 0.0]
+                        dist_val = 0.0
+                    elif d == "arriba":
+                        v_vec = [0.0, 0.0, 1.0]
+                        dist_val = round(m.explode_dist_cm, 2)
+                    elif d == "abajo":
+                        v_vec = [0.0, 0.0, -1.0]
+                        dist_val = round(m.explode_dist_cm, 2)
+                    elif d == "adelante":
+                        v_vec = [0.0, 1.0, 0.0]
+                        dist_val = round(m.explode_dist_cm, 2)
+                    elif d == "atras":
+                        v_vec = [0.0, -1.0, 0.0]
+                        dist_val = round(m.explode_dist_cm, 2)
+                    elif d == "derecha":
+                        v_vec = [1.0, 0.0, 0.0]
+                        dist_val = round(m.explode_dist_cm, 2)
+                    elif d == "izquierda":
+                        v_vec = [-1.0, 0.0, 0.0]
+                        dist_val = round(m.explode_dist_cm, 2)
+                    else:  # custom
+                        v_vec = list(m.explode_vector)
+                        dist_val = round(m.explode_dist_cm, 2)
+
+                    extras["explode_vector"] = v_vec
+                    extras["explode_dist_cm"] = dist_val
                 else:
                     extras["usar_explode"] = False
+                    v_vec = None
+                    dist_val = None
 
                 # Retrocompatibilidad con Asistente de Manuales 2.0
                 extras["mn_meta"] = json.dumps({
@@ -697,8 +745,9 @@ class JV_OT_export(Operator, ExportHelper):
                     "orden_ensamble": m.orden_ensamble,
                     "nota_taller": m.nota_taller.strip(),
                     "usar_explode": m.usar_explode,
-                    "explode_vector": list(m.explode_vector) if m.usar_explode else None,
-                    "explode_dist_cm": round(m.explode_dist_cm, 2) if m.usar_explode else None,
+                    "explode_direccion": m.explode_direccion if m.usar_explode else "auto",
+                    "explode_vector": v_vec,
+                    "explode_dist_cm": dist_val,
                 }, ensure_ascii=False)
 
                 estampar(o, extras)
